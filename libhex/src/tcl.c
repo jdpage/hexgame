@@ -478,6 +478,8 @@ int Hex_Init(Tcl_Interp *interp)
     }
   }
 
+  // TODO: get version from CMake
+  Tcl_PkgProvide(interp, "hex", "0.1");
   return TCL_OK;
 
  error_cleanup_hexboard:
