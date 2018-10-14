@@ -391,6 +391,72 @@ int hex_board_coords_method(
 }
 
 
+int hex_board_dump_method(
+  ClientData clientData,
+  Tcl_Interp *interp,
+  Tcl_ObjectContext objectContext,
+  int objc,
+  Tcl_Obj *const *objv)
+{
+  hex_board *self;
+  int err = TCL_OK;
+  Tcl_Obj *dump_obj;
+  Tcl_DString dump;
+  int size;
+  TCLTRY(hex_context_to_board(objectContext, &self));
+
+  if (objc != 2) {
+    Tcl_WrongNumArgs(interp, 1, objv, "dump");
+    return TCL_ERROR;
+  }
+
+  size = hex_board_size(self);
+
+  Tcl_DStringInit(&dump);
+  Tcl_DStringSetLength(&dump, size * size);
+
+  if (hex_board_dump(
+        self, Tcl_DStringValue(&dump), Tcl_DStringLength(&dump) + 1)
+      != HEX_OK)
+  {
+    Tcl_SetResult(interp, "bug in internal size calculation", TCL_STATIC);
+    err = TCL_ERROR;
+    goto cleanup;
+  }
+
+  Tcl_DStringResult(interp, &dump);
+
+ cleanup:
+  Tcl_DStringFree(&dump);
+
+  return err;
+}
+
+
+int hex_board_scan_method(
+  ClientData clientData,
+  Tcl_Interp *interp,
+  Tcl_ObjectContext objectContext,
+  int objc,
+  Tcl_Obj *const *objv)
+{
+  hex_board *self;
+  TCLTRY(hex_context_to_board(objectContext, &self));
+
+  if (objc != 3) {
+    Tcl_WrongNumArgs(interp, 1, objv, "scan board");
+    return TCL_ERROR;
+  }
+
+  if (hex_board_scan(self, Tcl_GetString(objv[2])) != HEX_OK) {
+    Tcl_SetResult(interp, "board size mismatch", TCL_STATIC);
+    return TCL_ERROR;
+  }
+
+  return TCL_OK;
+}
+
+
 static Tcl_MethodType board_methods[] = {
   { TCL_OO_METHOD_VERSION_CURRENT, NULL, hex_board_ctor_method },
   { TCL_OO_METHOD_VERSION_CURRENT, "size", hex_board_size_method },
@@ -400,6 +466,8 @@ static Tcl_MethodType board_methods[] = {
   { TCL_OO_METHOD_VERSION_CURRENT, "clear", hex_board_clear_method },
   { TCL_OO_METHOD_VERSION_CURRENT, "winner", hex_board_winner_method },
   { TCL_OO_METHOD_VERSION_CURRENT, "coords", hex_board_coords_method },
+  { TCL_OO_METHOD_VERSION_CURRENT, "dump", hex_board_dump_method },
+  { TCL_OO_METHOD_VERSION_CURRENT, "scan", hex_board_scan_method },
   { -1 },
 };
 
