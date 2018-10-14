@@ -7,3 +7,5 @@ add_executable (hexmon
   src/hexmon.c)
 target_link_libraries (hexmon ${CMAKE_DL_LIBS} hexmonlib)
 target_include_directories (hexmon PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+install (TARGETS hexmon
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
