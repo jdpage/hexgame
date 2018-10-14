@@ -1,6 +1,6 @@
 cmake_minimum_required (VERSION 3.11)
 project (hexgame)
 
-include (FindTclStub)
+find_package (TclStub REQUIRED)
 
 add_subdirectory (libhex)

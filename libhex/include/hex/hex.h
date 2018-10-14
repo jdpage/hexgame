@@ -9,6 +9,7 @@ enum hex_err_e {
   HEX_EBOUNDS,
   HEX_EBADSPACE,
   HEX_ESIZEMISMATCH,
+  HEX_ESHORTBUFFER,
   HEX_ERRS_MAX
 };
 
@@ -46,6 +47,23 @@ int hex_board_size(const hex_board *board);
 // contiguous.
 hex_color *hex_board_data(hex_board *board, size_t *data_len);
 const hex_color *hex_board_rodata(const hex_board *board, size_t *data_len);
+
+// Dumps the string representation of the board into the given buffer as a
+// null-terminated string. If the buffer is not long enough to hold the entire
+// board and a null byte, HEX_ESHORTBUFFER is returned. hex_board_dumpsize
+// returns the number of bytes required to hold a board dump, including the null
+// terminator. The string representation consists of each space in column-major
+// order where the characters 'r', 'b', and '.' denote red, blue, and empty
+// spaces respectively.
+hex_err hex_board_dump(const hex_board *board, char *buf, size_t buf_len);
+size_t hex_board_dumpsize(const hex_board *board);
+
+// Loads the string representation into the board. If the string representation
+// is the wrong size, HEX_ESIZEMISMATCH is returned, and the board data may have
+// been partially overwritten. The accepted string representation is as above,
+// and is handled case-insensitively, and any unrecognized character is assumed
+// to be an empty space.
+hex_err hex_board_load(hex_board *board, const char *buf);
 
 // Gets a pointer to a space on the board. Returns HEX_EBOUNDS if row, col are
 // out-of-bounds.
