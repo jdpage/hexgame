@@ -63,7 +63,7 @@ size_t hex_board_dumpsize(const hex_board *board);
 // been partially overwritten. The accepted string representation is as above,
 // and is handled case-insensitively, and any unrecognized character is assumed
 // to be an empty space.
-hex_err hex_board_load(hex_board *board, const char *buf);
+hex_err hex_board_scan(hex_board *board, const char *buf);
 
 // Gets a pointer to a space on the board. Returns HEX_EBOUNDS if row, col are
 // out-of-bounds.

@@ -16,7 +16,7 @@ void dummy_move(void *data, char *board, int *row, int *col)
   hex_color *space;
   int size = hex_board_size(state->board);
 
-  if ((err = hex_board_load(state->board, board)) != HEX_OK) {
+  if ((err = hex_board_scan(state->board, board)) != HEX_OK) {
     fprintf(stderr, "%s: board size mismatch\n", state->host->optv[0]);
     exit(2);
   }

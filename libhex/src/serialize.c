@@ -33,7 +33,7 @@ size_t hex_board_dumpsize(const hex_board *board)
 }
 
 
-hex_err hex_board_load(hex_board *board, const char *buf)
+hex_err hex_board_scan(hex_board *board, const char *buf)
 {
   int remaining = board->size * board->size;
   hex_color *ptr = board->data;
