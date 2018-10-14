@@ -4,3 +4,5 @@ project (hexgame)
 find_package (TclStub REQUIRED)
 
 add_subdirectory (libhex)
+add_subdirectory (hexmon)
+add_subdirectory (ai)
