@@ -46,11 +46,20 @@ void dummy_move(void *data, char *board, int *row, int *col)
   // find the first empty space and play in it
   for (int c = 0; c < size; c++) {
     for (int r = 0; r < size; r++) {
-      hex_board_space(state->board, r, c, &space);
-      if (*space == HEX_COLOR_NONE) {
-        *row = r;
-        *col = c;
-        return;
+      if (state->host->color == 'r') {
+        hex_board_space(state->board, r, c, &space);
+        if (*space == HEX_COLOR_NONE) {
+          *row = r;
+          *col = c;
+          return;
+        }
+      } else {
+        hex_board_space(state->board, c, r, &space);
+        if (*space == HEX_COLOR_NONE) {
+          *row = c;
+          *col = r;
+          return;
+        }
       }
     }
   }
