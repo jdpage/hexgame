@@ -89,6 +89,7 @@ int run_monitor(int size, hex_ai_info *ai)
       ai->move_callback(ai->data, board, &row, &col);
       free(board);
       printf("%d %d\n", row, col);
+      fflush(stdout);
     } else if (scanf(" quit %ms", &board) > 0) {
       if (ai->destroy_callback != NULL) {
         ai->destroy_callback(ai->data, board);
