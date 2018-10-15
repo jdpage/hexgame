@@ -375,13 +375,14 @@ int hex_board_coords_method(
   }
 
   size = hex_board_size(self);
-  lstc = size * size;
+  lstc = size * size * 2;
   lstv = tcl_calloc(lstc, sizeof(Tcl_Obj *));
 
   lstp = lstv;
   for (int c = 0; c < size; c++) {
     for (int r = 0; r < size; r++) {
-      *(lstp++) = hex_coords_to_list(r, c);
+      *(lstp++) = Tcl_NewIntObj(r);
+      *(lstp++) = Tcl_NewIntObj(c);
     }
   }
 
