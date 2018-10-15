@@ -32,12 +32,12 @@ hex_err hex_board_getwinner(const hex_board *board, hex_color *winner)
 #define SEARCH_POP() (search_queue[search_index--])
 #define VISITED(spc) (visited[(spc) - space_zero])
 
-  search_queue = calloc(space_count, sizeof(const hex_color *));
+  search_queue = calloc((size_t) space_count, sizeof(const hex_color *));
   if (search_queue == NULL) {
     goto cleanup_done;
   }
 
-  visited = calloc(space_count, sizeof(int));
+  visited = calloc((size_t) space_count, sizeof(int));
   if (visited == NULL) {
     goto cleanup_search_queue;
   }
@@ -92,7 +92,6 @@ hex_err hex_board_getwinner(const hex_board *board, hex_color *winner)
   }
 
  cleanup_all:
- cleanup_visited:
   free(visited);
 
  cleanup_search_queue:

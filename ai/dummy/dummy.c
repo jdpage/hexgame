@@ -18,6 +18,12 @@
 #include <hex/hexmon.h>
 #include <stdio.h>
 
+#ifdef __GNUC__
+#  define UNUSED(x) UNUSED_ ## x __attribute__((__unused__))
+#else
+#  define UNUSED(x) UNUSED_ ## x
+#endif
+
 
 typedef struct {
   hex_host_info *host;
@@ -51,7 +57,7 @@ void dummy_move(void *data, char *board, int *row, int *col)
 }
 
 
-void dummy_destroy(void *data, char *board)
+void dummy_destroy(void *data, char * UNUSED(board))
 {
   dummy_state *state = data;
   free(state->board);
@@ -71,6 +77,11 @@ void dummy_ai_init(hex_host_info *host, hex_ai_info *ai)
       fprintf(stderr, "%s: invalid board size %d\n",
               host->optv[0], host->size);
       exit(2);
+
+    default:
+      fprintf(stderr, "%s: unknown error in board init\n",
+              host->optv[0]);
+      exit(3);
 
     case HEX_ENOMEM:
       exit(3);

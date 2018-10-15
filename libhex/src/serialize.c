@@ -45,7 +45,7 @@ hex_err hex_board_dump(const hex_board *board, char *buf, size_t buf_len)
 
 size_t hex_board_dumpsize(const hex_board *board)
 {
-  return sizeof(char) * (board->size * board->size + 1);
+  return sizeof(char) * ((size_t) (board->size * board->size + 1));
 }
 
 

@@ -28,6 +28,13 @@
   } while (0)
 
 
+#ifdef __GNUC__
+#  define UNUSED(x) UNUSED_ ## x __attribute__((__unused__))
+#else
+#  define UNUSED(x) UNUSED_ ## x
+#endif
+
+
 void *tcl_calloc(size_t nmemb, size_t size) {
   if (size > SIZE_MAX / nmemb) {
     return NULL;
@@ -42,7 +49,6 @@ void *tcl_calloc(size_t nmemb, size_t size) {
 
 void hex_delete_board_metadata(ClientData metadata)
 {
-  hex_board *board = metadata;
   ckfree(metadata);
 }
 
@@ -95,7 +101,7 @@ int hex_context_to_board(
 
 
 int hex_board_ctor_method(
-  ClientData clientData,
+  ClientData UNUSED(clientData),
   Tcl_Interp *interp,
   Tcl_ObjectContext objectContext,
   int objc,
@@ -135,7 +141,7 @@ int hex_board_ctor_method(
 
 
 int hex_board_size_method(
-  ClientData clientData,
+  ClientData UNUSED(clientData),
   Tcl_Interp *interp,
   Tcl_ObjectContext objectContext,
   int objc,
@@ -191,16 +197,15 @@ Tcl_Obj *hex_color_to_obj(hex_color color) {
 
 
 int hex_board_get_method(
-  ClientData clientData,
+  ClientData UNUSED(clientData),
   Tcl_Interp *interp,
   Tcl_ObjectContext objectContext,
   int objc,
   Tcl_Obj *const *objv)
 {
   hex_board *self;
-  int len, row, col;
+  int row, col;
   hex_err err;
-  Tcl_Obj *elem;
   hex_color *color;
 
   TCLTRY(hex_context_to_board(objectContext, &self));
@@ -224,16 +229,15 @@ int hex_board_get_method(
 
 
 int hex_board_set_method(
-  ClientData clientData,
+  ClientData UNUSED(clientData),
   Tcl_Interp *interp,
   Tcl_ObjectContext objectContext,
   int objc,
   Tcl_Obj *const *objv)
 {
   hex_board *self;
-  int len, row, col;
+  int row, col;
   hex_err err;
-  Tcl_Obj *elem;
   hex_color *color;
   char *new_color;
 
@@ -281,7 +285,7 @@ Tcl_Obj *hex_coords_to_list(int row, int col)
 
 
 int hex_board_neighbors_method(
-  ClientData clientData,
+  ClientData UNUSED(clientData),
   Tcl_Interp *interp,
   Tcl_ObjectContext objectContext,
   int objc,
@@ -293,7 +297,6 @@ int hex_board_neighbors_method(
   int neighbors[12];
   int neighbor_count;
   Tcl_Obj *neighbor_objs[6];
-  Tcl_Obj *coord_objs[2];
 
   TCLTRY(hex_context_to_board(objectContext, &self));
 
@@ -326,7 +329,7 @@ int hex_board_neighbors_method(
 
 
 int hex_board_clear_method(
-  ClientData clientData,
+  ClientData UNUSED(clientData),
   Tcl_Interp *interp,
   Tcl_ObjectContext objectContext,
   int objc,
@@ -346,7 +349,7 @@ int hex_board_clear_method(
 
 
 int hex_board_winner_method(
-  ClientData clientData,
+  ClientData UNUSED(clientData),
   Tcl_Interp *interp,
   Tcl_ObjectContext objectContext,
   int objc,
@@ -373,7 +376,7 @@ int hex_board_winner_method(
 
 
 int hex_board_coords_method(
-  ClientData clientData,
+  ClientData UNUSED(clientData),
   Tcl_Interp *interp,
   Tcl_ObjectContext objectContext,
   int objc,
@@ -392,7 +395,7 @@ int hex_board_coords_method(
 
   size = hex_board_size(self);
   lstc = size * size * 2;
-  lstv = tcl_calloc(lstc, sizeof(Tcl_Obj *));
+  lstv = tcl_calloc((size_t) lstc, sizeof(Tcl_Obj *));
 
   lstp = lstv;
   for (int c = 0; c < size; c++) {
@@ -409,7 +412,7 @@ int hex_board_coords_method(
 
 
 int hex_board_dump_method(
-  ClientData clientData,
+  ClientData UNUSED(clientData),
   Tcl_Interp *interp,
   Tcl_ObjectContext objectContext,
   int objc,
@@ -417,7 +420,6 @@ int hex_board_dump_method(
 {
   hex_board *self;
   int err = TCL_OK;
-  Tcl_Obj *dump_obj;
   Tcl_DString dump;
   int size;
   TCLTRY(hex_context_to_board(objectContext, &self));
@@ -433,7 +435,7 @@ int hex_board_dump_method(
   Tcl_DStringSetLength(&dump, size * size);
 
   if (hex_board_dump(
-        self, Tcl_DStringValue(&dump), Tcl_DStringLength(&dump) + 1)
+        self, Tcl_DStringValue(&dump), (size_t) (Tcl_DStringLength(&dump) + 1))
       != HEX_OK)
   {
     Tcl_SetResult(interp, "bug in internal size calculation", TCL_STATIC);
@@ -451,7 +453,7 @@ int hex_board_dump_method(
 
 
 int hex_board_scan_method(
-  ClientData clientData,
+  ClientData UNUSED(clientData),
   Tcl_Interp *interp,
   Tcl_ObjectContext objectContext,
   int objc,
@@ -475,17 +477,17 @@ int hex_board_scan_method(
 
 
 static Tcl_MethodType board_methods[] = {
-  { TCL_OO_METHOD_VERSION_CURRENT, NULL, hex_board_ctor_method },
-  { TCL_OO_METHOD_VERSION_CURRENT, "size", hex_board_size_method },
-  { TCL_OO_METHOD_VERSION_CURRENT, "get", hex_board_get_method },
-  { TCL_OO_METHOD_VERSION_CURRENT, "set", hex_board_set_method },
-  { TCL_OO_METHOD_VERSION_CURRENT, "neighbors", hex_board_neighbors_method },
-  { TCL_OO_METHOD_VERSION_CURRENT, "clear", hex_board_clear_method },
-  { TCL_OO_METHOD_VERSION_CURRENT, "winner", hex_board_winner_method },
-  { TCL_OO_METHOD_VERSION_CURRENT, "coords", hex_board_coords_method },
-  { TCL_OO_METHOD_VERSION_CURRENT, "dump", hex_board_dump_method },
-  { TCL_OO_METHOD_VERSION_CURRENT, "scan", hex_board_scan_method },
-  { -1 },
+  { TCL_OO_METHOD_VERSION_CURRENT, NULL, hex_board_ctor_method, NULL, NULL },
+  { TCL_OO_METHOD_VERSION_CURRENT, "size", hex_board_size_method, NULL, NULL },
+  { TCL_OO_METHOD_VERSION_CURRENT, "get", hex_board_get_method, NULL, NULL },
+  { TCL_OO_METHOD_VERSION_CURRENT, "set", hex_board_set_method, NULL, NULL },
+  { TCL_OO_METHOD_VERSION_CURRENT, "neighbors", hex_board_neighbors_method, NULL, NULL },
+  { TCL_OO_METHOD_VERSION_CURRENT, "clear", hex_board_clear_method, NULL, NULL },
+  { TCL_OO_METHOD_VERSION_CURRENT, "winner", hex_board_winner_method, NULL, NULL },
+  { TCL_OO_METHOD_VERSION_CURRENT, "coords", hex_board_coords_method, NULL, NULL },
+  { TCL_OO_METHOD_VERSION_CURRENT, "dump", hex_board_dump_method, NULL, NULL },
+  { TCL_OO_METHOD_VERSION_CURRENT, "scan", hex_board_scan_method, NULL, NULL },
+  { -1, NULL, NULL, NULL, NULL },
 };
 
 

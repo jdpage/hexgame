@@ -66,7 +66,7 @@ int load_ai(hex_host_info *host, hex_ai_info *ai) {
     fprintf(stderr, "error loading \"%s\": %s\n",
             host->optv[0], dlerror());
     err = 1;
-    goto cleanup;
+    goto cleanup_all;
   }
 
   if ((init = dlsym(lib, symname)) == NULL) {
@@ -78,13 +78,7 @@ int load_ai(hex_host_info *host, hex_ai_info *ai) {
 
   init(host, ai);
 
-  goto cleanup;
-
- error_cleanup_lib:
-  dlclose(lib);
-
- cleanup:
- cleanup_symname:
+ cleanup_all:
   free(symname);
 
  cleanup_path:
@@ -93,10 +87,14 @@ int load_ai(hex_host_info *host, hex_ai_info *ai) {
 
  cleanup_none:
   return err;
+
+ error_cleanup_lib:
+  dlclose(lib);
+  goto cleanup_all;
 }
 
 
-int run_monitor(int size, hex_ai_info *ai)
+int run_monitor(hex_ai_info *ai)
 {
   char *board;
   int row, col;
@@ -127,16 +125,17 @@ int main(int argc, char *argv[])
   }
 
   errno = 0;
-  int size = strtol(argv[1], NULL, 10);
-  if (errno != 0) {
+  long size = strtol(argv[1], NULL, 10);
+  if (errno != 0 || size < INT_MIN || size > INT_MAX) {
     fprintf(stderr, "size argument must be an integer\n");
     return 1;
   }
 
+
   hex_host_info host = {
     .optv = argv + 3,
     .optc = argc - 3,
-    .size = size,
+    .size = (int) size,
     .color = argv[2][0],
   };
 
@@ -156,5 +155,5 @@ int main(int argc, char *argv[])
     return err;
   }
 
-  return run_monitor(size, &ai);
+  return run_monitor(&ai);
 }

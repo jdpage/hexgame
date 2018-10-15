@@ -93,7 +93,7 @@ hex_err hex_board_initatz(hex_board *board, int size)
 
 size_t hex_board_sizeof(int size)
 {
-  return sizeof(hex_board) + sizeof(hex_color) * size * size;
+  return sizeof(hex_board) + sizeof(hex_color) * ((size_t) (size * size));
 }
 
 
@@ -271,7 +271,7 @@ hex_err hex_board_roneighbors(
 
 void hex_board_clear(hex_board *board)
 {
-  memset(board->data, 0, sizeof(hex_color) * board->size * board->size);
+  memset(board->data, 0, sizeof(hex_color) * ((size_t) (board->size * board->size)));
 }
 
 
@@ -282,7 +282,7 @@ hex_err hex_board_copy(hex_board *dest, const hex_board *src)
   }
 
   if (src != dest) {
-    memcpy(dest->data, src->data, sizeof(hex_color) * dest->size * dest->size);
+    memcpy(dest->data, src->data, sizeof(hex_color) * ((size_t) (dest->size * dest->size)));
   }
 
   return HEX_OK;
