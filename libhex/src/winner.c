@@ -19,73 +19,67 @@
 
 hex_err hex_board_getwinner(const hex_board *board, hex_color *winner)
 {
-  hex_err err = HEX_OK;
-  const hex_color **search_queue;
-  int search_index = -1;
+  int *search_queue;
   int *visited;
-  int space_count = board->size * board->size;
-  const hex_color *space_zero;
-  const hex_color *neighbors[6];
+  int neighbors[6];
   int neighbor_count;
+  int search_index = -1;
+  int index_count = hex_board_index_count(board);
+  hex_err err = HEX_OK;
 
 #define SEARCH_PUSH(spc) (search_queue[++search_index] = (spc))
 #define SEARCH_POP() (search_queue[search_index--])
-#define VISITED(spc) (visited[(spc) - space_zero])
+#define COLOR(i) (board->data[i].color)
 
-  search_queue = calloc((size_t) space_count, sizeof(const hex_color *));
+  search_queue = calloc((size_t) index_count, sizeof(int));
   if (search_queue == NULL) {
     goto cleanup_done;
   }
 
-  visited = calloc((size_t) space_count, sizeof(int));
+  visited = calloc((size_t) index_count, sizeof(int));
   if (visited == NULL) {
     goto cleanup_search_queue;
   }
 
-  HEX_TRYC(err, hex_board_rospace(board, 0, 0, &space_zero), cleanup_all);
-
   // We can start the search from the top and left sides, since if there's a win
   // we'll reach the other side, by definition. Left is blue, top is red.
   for (int k = 0; k < board->size; k++) {
-    const hex_color *space;
-
-    HEX_TRYC(err, hex_board_rospace(board, k, 0, &space), cleanup_all);
-    if (*space == HEX_COLOR_BLUE) {
-      SEARCH_PUSH(space);
+    int index = hex_board_unsafe_index(board, k, 0);
+    if (COLOR(index) == HEX_COLOR_BLUE) {
+      SEARCH_PUSH(index);
     }
 
-    HEX_TRYC(err, hex_board_rospace(board, 0, k, &space), cleanup_all);
-    if (*space == HEX_COLOR_RED) {
-      SEARCH_PUSH(space);
+    index = hex_board_unsafe_index(board, 0, k);
+    if (COLOR(index) == HEX_COLOR_RED) {
+      SEARCH_PUSH(index);
     }
   }
 
   // Now we can do a DFS traversal of the board.
   *winner = HEX_COLOR_NONE;
   while (search_index >= 0) {
-    int row, col;
-    const hex_color *space = SEARCH_POP();
-    VISITED(space) = 1;
+    int row, col, index = SEARCH_POP();
+    visited[index] = 1;
 
     // Check for a win. A blue space which is on the right edge of the board is
     // a win for blue, and a red space on the bottom edge of the board is a win
     // for red. It's impossible for both to have one, so early-exit is ok.
-    HEX_TRYC(err, hex_board_coords(board, space, &row, &col), cleanup_all);
-    if ((*space == HEX_COLOR_BLUE && col == board->size - 1)
-        || (*space == HEX_COLOR_RED && row == board->size - 1)) {
-      *winner = *space;
+    HEX_TRYC(err, hex_board_icoords(board, index, &row, &col), cleanup_all);
+    if ((COLOR(index) == HEX_COLOR_BLUE && col == board->size - 1)
+        || (COLOR(index) == HEX_COLOR_RED && row == board->size - 1)) {
+      *winner = COLOR(index);
       break;
     }
 
     // Add the neighbors to the search queue if they're the same color as the
-    // current space, and we haven't visited them yet.
+    // current space, and we haven't visited them yet. Ignoring the error 
     HEX_TRYC(err,
-             hex_board_roneighbors(
-               board, space,
+             hex_board_ineighbors(
+               board, index,
                neighbors, &neighbor_count),
              cleanup_all);
     for (int k = 0; k < neighbor_count; k++) {
-      if (!VISITED(neighbors[k]) && *(neighbors[k]) == *space) {
+      if (!visited[neighbors[k]] && COLOR(neighbors[k]) == COLOR(index)) {
         SEARCH_PUSH(neighbors[k]);
       }
     }
@@ -102,4 +96,5 @@ hex_err hex_board_getwinner(const hex_board *board, hex_color *winner)
 
 #undef SEARCH_PUSH
 #undef SEARCH_POP
+#undef COLOR
 }

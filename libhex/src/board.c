@@ -30,11 +30,9 @@ static inline hex_err hex_check_size(int size)
 }
 
 
-static inline hex_err hex_check_bounds(
-  const hex_board *board,
-  int row, int col)
+static inline hex_err hex_check_sbounds(int size, int row, int col)
 {
-  if (row < 0 || row >= board->size || col < 0 || col >= board->size) {
+  if (row < 0 || row >= size || col < 0 || col >= size) {
     return HEX_EBOUNDS;
   }
 
@@ -42,14 +40,24 @@ static inline hex_err hex_check_bounds(
 }
 
 
-static inline hex_err hex_check_space(
+static inline hex_err hex_check_ibounds(int size, int index)
+{
+  if (index < 0 || index > size * size) {
+    return HEX_EBOUNDS;
+  }
+
+  return HEX_OK;
+}
+
+
+static inline hex_err hex_check_tile(
   const hex_board *board,
-  const hex_color *space,
+  const hex_tile *tile,
   int *index)
 {
-  ptrdiff_t offset = space - board->data;
+  ptrdiff_t offset = tile - board->data;
   if (offset < 0 || offset >= board->size * board->size) {
-    return HEX_EBADSPACE;
+    return HEX_EBOUNDS;
   }
 
   // during initialization we already established that all space offsets fit
@@ -93,7 +101,7 @@ hex_err hex_board_initatz(hex_board *board, int size)
 
 size_t hex_board_sizeof(int size)
 {
-  return sizeof(hex_board) + sizeof(hex_color) * ((size_t) (size * size));
+  return sizeof(hex_board) + sizeof(hex_tile) * ((size_t) (size * size));
 }
 
 
@@ -103,7 +111,7 @@ int hex_board_size(const hex_board *board)
 }
 
 
-hex_color *hex_board_data(hex_board *board, size_t *data_len)
+hex_tile *hex_board_data(hex_board *board, size_t *data_len)
 {
   // board->size is > 0
   *data_len = (size_t) (board->size * board->size);
@@ -111,7 +119,7 @@ hex_color *hex_board_data(hex_board *board, size_t *data_len)
 }
 
 
-const hex_color *hex_board_rodata(const hex_board *board, size_t *data_len)
+const hex_tile *hex_board_rodata(const hex_board *board, size_t *data_len)
 {
   // board->size is > 0
   *data_len = (size_t) (board->size * board->size);
@@ -119,35 +127,136 @@ const hex_color *hex_board_rodata(const hex_board *board, size_t *data_len)
 }
 
 
-hex_err hex_board_space(
+hex_err hex_board_index(
+  const hex_board *board,
+  int row, int col,
+  int *index)
+{
+  HEX_TRY(hex_check_sbounds(board->size, row, col));
+  *index = hex_board_unsafe_sindex(board->size, row, col);
+  return HEX_OK;
+}
+
+
+int hex_board_unsafe_index(
+  const hex_board *board,
+  int row, int col)
+{
+  return hex_board_unsafe_sindex(board->size, row, col);
+}
+
+
+hex_err hex_board_sindex(int size, int row, int col, int *index)
+{
+  HEX_TRY(hex_check_sbounds(size, row, col));
+  *index = hex_board_unsafe_sindex(size, row, col);
+  return HEX_OK;
+}
+
+
+int hex_board_unsafe_sindex(int size, int row, int col)
+{
+  return row + col * size;
+}
+
+
+int hex_board_index_count(const hex_board *board)
+{
+  return hex_board_sindex_count(board->size);
+}
+
+
+int hex_board_sindex_count(int size) { return size * size; }
+
+
+hex_err hex_board_rctile(
   hex_board *board,
   int row, int col,
-  hex_color **space)
+  hex_tile **tile)
 {
-  HEX_TRY(hex_check_bounds(board, row, col));
-  *space = &(board->data[row + col * board->size]);
+  int index;
+  HEX_TRY(hex_board_index(board, row, col, &index));
+  *tile = &board->data[index];
   return HEX_OK;
 }
 
 
-hex_err hex_board_rospace(
+hex_tile *hex_board_unsafe_rctile(hex_board *board, int row, int col)
+{
+  int index = hex_board_unsafe_index(board, row, col);
+  return &board->data[index];
+}
+
+
+hex_err hex_board_rorctile(
   const hex_board *board,
   int row, int col,
-  const hex_color **space)
+  const hex_tile **tile)
 {
-  HEX_TRY(hex_check_bounds(board, row, col));
-  *space = &(board->data[row + col * board->size]);
+  int index;
+  HEX_TRY(hex_board_index(board, row, col, &index));
+  *tile = &board->data[index];
   return HEX_OK;
 }
 
 
-hex_err hex_board_coords(
+const hex_tile *hex_board_unsafe_rorctile(
+  const hex_board *board, int row, int col)
+{
+  int index = hex_board_unsafe_index(board, row, col);
+  return &board->data[index];
+}
+
+
+hex_err hex_board_itile(
+  hex_board *board, int index, hex_tile **tile)
+{
+  HEX_TRY(hex_check_ibounds(board->size, index));
+  *tile = &board->data[index];
+  return HEX_OK;
+}
+
+
+hex_tile *hex_board_unsafe_itile(hex_board *board, int index)
+{
+  return &board->data[index];
+}
+
+
+hex_err hex_board_roitile(
+  const hex_board *board, int index, const hex_tile **tile)
+{
+  HEX_TRY(hex_check_ibounds(board->size, index));
+  *tile = &board->data[index];
+  return HEX_OK;
+}
+
+
+const hex_tile *hex_board_unsafe_roitile(
+  const hex_board *board, int index)
+{
+  return &board->data[index];
+}
+
+
+hex_err hex_board_tcoords(
   const hex_board *board,
-  const hex_color *space,
+  const hex_tile *tile,
   int *row, int *col)
 {
   int index;
-  HEX_TRY(hex_check_space(board, space, &index));
+  HEX_TRY(hex_check_tile(board, tile, &index));
+  *row = index % board->size;
+  *col = index / board->size;
+  return HEX_OK;
+}
+
+
+hex_err hex_board_icoords(
+  const hex_board *board,
+  int index, int *row, int *col)
+{
+  HEX_TRY(hex_check_ibounds(board->size, index));
   *row = index % board->size;
   *col = index / board->size;
   return HEX_OK;
@@ -156,45 +265,45 @@ hex_err hex_board_coords(
 
 hex_err hex_board_correlate(
   hex_board *dest_board,
-  hex_color **dest_space,
+  hex_tile **dest_tile,
   const hex_board *src_board,
-  const hex_color *src_space)
+  const hex_tile *src_tile)
 {
   if (dest_board->size != src_board->size) {
     return HEX_ESIZEMISMATCH;
   }
 
   int index;
-  HEX_TRY(hex_check_space(src_board, src_space, &index));
-  *dest_space = &(dest_board->data[index]);
+  HEX_TRY(hex_check_tile(src_board, src_tile, &index));
+  *dest_tile = &dest_board->data[index];
   return HEX_OK;
 }
 
 
 hex_err hex_board_rocorrelate(
   const hex_board *dest_board,
-  const hex_color **dest_space,
+  const hex_tile **dest_tile,
   const hex_board *src_board,
-  const hex_color *src_space)
+  const hex_tile *src_tile)
 {
   if (dest_board->size != src_board->size) {
     return HEX_ESIZEMISMATCH;
   }
 
   int index;
-  HEX_TRY(hex_check_space(src_board, src_space, &index));
-  *dest_space = &(dest_board->data[index]);
+  HEX_TRY(hex_check_tile(src_board, src_tile, &index));
+  *dest_tile = &dest_board->data[index];
   return HEX_OK;
 }
 
 
-hex_err hex_board_neighborcoords(
+hex_err hex_board_rcneighbors(
   const hex_board *board,
   int row, int col,
   int *neighbors,
   int *neighbor_count)
 {
-  HEX_TRY(hex_check_bounds(board, row, col));
+  HEX_TRY(hex_check_sbounds(board->size, row, col));
 
   *neighbor_count = 0;
   int *ptr = neighbors;
@@ -204,7 +313,7 @@ hex_err hex_board_neighborcoords(
       if (r == c) { continue; }
 
       int nr = row + r, nc = col + c;
-      if (hex_check_bounds(board, nr, nc) != HEX_OK) {
+      if (hex_check_sbounds(board->size, nr, nc) != HEX_OK) {
         continue;
       }
 
@@ -218,51 +327,66 @@ hex_err hex_board_neighborcoords(
 }
 
 
-hex_err hex_board_neighbors(
-  hex_board *board,
-  hex_color *space,
-  hex_color **neighbors,
+hex_err hex_board_ineighbors(
+  const hex_board *board,
+  int index,
+  int *neighbors,
   int *neighbor_count)
 {
   int row, col;
-  int neighborcoords[12];
-  HEX_TRY(hex_board_coords(board, space, &row, &col));
-  HEX_TRY(hex_board_neighborcoords(
-            board,
-            row, col,
-            neighborcoords, neighbor_count));
+  int rcneighbors[12];
+  HEX_TRY(hex_board_icoords(board, index, &row, &col));
+  HEX_TRY(hex_board_rcneighbors(
+            board, row, col,
+            rcneighbors, neighbor_count));
 
   for (int k = 0; k < *neighbor_count; k++) {
-    HEX_TRY(hex_board_space(
-              board,
-              neighborcoords[2*k], neighborcoords[2*k + 1],
-              &(neighbors[k])));
+    neighbors[k] = hex_board_unsafe_index(
+      board, rcneighbors[2*k], rcneighbors[2*k+1]);
   }
 
   return HEX_OK;
 }
 
 
-
-hex_err hex_board_roneighbors(
-  const hex_board *board,
-  const hex_color *space,
-  const hex_color **neighbors,
+hex_err hex_board_tneighbors(
+  hex_board *board,
+  hex_tile *tile,
+  hex_tile **neighbors,
   int *neighbor_count)
 {
   int row, col;
-  int neighborcoords[12];
-  HEX_TRY(hex_board_coords(board, space, &row, &col));
-  HEX_TRY(hex_board_neighborcoords(
-            board,
-            row, col,
-            neighborcoords, neighbor_count));
+  int rcneighbors[12];
+  HEX_TRY(hex_board_tcoords(board, tile, &row, &col));
+  HEX_TRY(hex_board_rcneighbors(
+            board, row, col,
+            rcneighbors, neighbor_count));
 
   for (int k = 0; k < *neighbor_count; k++) {
-    HEX_TRY(hex_board_rospace(
-              board,
-              neighborcoords[2*k], neighborcoords[2*k + 1],
-              &(neighbors[k])));
+    neighbors[k] = hex_board_unsafe_rctile(
+      board, rcneighbors[2*k], rcneighbors[2*k + 1]);
+  }
+
+  return HEX_OK;
+}
+
+
+hex_err hex_board_rotneighbors(
+  const hex_board *board,
+  const hex_tile *tile,
+  const hex_tile **neighbors,
+  int *neighbor_count)
+{
+  int row, col;
+  int rcneighbors[12];
+  HEX_TRY(hex_board_tcoords(board, tile, &row, &col));
+  HEX_TRY(hex_board_rcneighbors(
+            board, row, col,
+            rcneighbors, neighbor_count));
+
+  for (int k = 0; k < *neighbor_count; k++) {
+    neighbors[k] = hex_board_unsafe_rorctile(
+      board, rcneighbors[2*k], rcneighbors[2*k + 1]);
   }
 
   return HEX_OK;
@@ -286,4 +410,16 @@ hex_err hex_board_copy(hex_board *dest, const hex_board *src)
   }
 
   return HEX_OK;
+}
+
+
+hex_color *hex_tile_color(hex_tile *tile)
+{
+  return &tile->color;
+}
+
+
+const hex_color *hex_tile_rocolor(const hex_tile *tile)
+{
+  return &tile->color;
 }

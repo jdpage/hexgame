@@ -8,7 +8,7 @@ target_compile_definitions (hex PRIVATE
   USE_TCL_STUBS
   USE_TCLOO_STUBS)
 
-target_link_libraries (hex ${TCL_STUB_LIBRARY})
+target_link_libraries (hex PRIVATE ${TCL_STUB_LIBRARY})
 
 target_include_directories (hex PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

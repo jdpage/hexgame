@@ -23,7 +23,6 @@ enum hex_err_e {
   HEX_OK,
   HEX_ENOMEM,
   HEX_EBOUNDS,
-  HEX_EBADSPACE,
   HEX_ESIZEMISMATCH,
   HEX_ESHORTBUFFER,
   HEX_ERRS_MAX
@@ -38,6 +37,7 @@ enum hex_color_e {
 
 typedef enum hex_err_e hex_err;
 typedef enum hex_color_e hex_color;
+typedef struct hex_tile_s hex_tile;
 typedef struct hex_board_s hex_board;
 
 typedef void *hex_alloc(size_t nmemb, size_t size);
@@ -59,10 +59,30 @@ size_t hex_board_sizeof(int size);
 // Gets the size of the board.
 int hex_board_size(const hex_board *board);
 
-// Gets a pointer to the board data, in column-major order, i.e. columns are
-// contiguous.
-hex_color *hex_board_data(hex_board *board, size_t *data_len);
-const hex_color *hex_board_rodata(const hex_board *board, size_t *data_len);
+// Gets a pointer to the board data. Use hex_board_index to get individual tiles
+// within the buffer.
+hex_tile *hex_board_data(hex_board *board, size_t *data_len);
+const hex_tile *hex_board_rodata(const hex_board *board, size_t *data_len);
+
+// Converts a row, column pair into an index. Returns HEX_EBOUNDS if the given
+// coordinates are out of bounds.
+hex_err hex_board_index(
+  const hex_board *board,
+  int row, int col,
+  int *index);
+int hex_board_unsafe_index(
+  const hex_board *board,
+  int row, int col);
+hex_err hex_board_sindex(
+  int size, int row, int col, int *index);
+int hex_board_unsafe_sindex(
+  int size, int row, int col);
+
+// Returns a number one larger than the largest index returned by
+// hex_board_index. This is the same value placed into data_len when calling
+// hex_board_data.
+int hex_board_index_count(const hex_board *board);
+int hex_board_sindex_count(int size);
 
 // Dumps the string representation of the board into the given buffer as a
 // null-terminated string. If the buffer is not long enough to hold the entire
@@ -81,60 +101,95 @@ size_t hex_board_dumpsize(const hex_board *board);
 // to be an empty space.
 hex_err hex_board_scan(hex_board *board, const char *buf);
 
-// Gets a pointer to a space on the board. Returns HEX_EBOUNDS if row, col are
-// out-of-bounds.
-hex_err hex_board_space(
+// Gets a pointer to a tile on the board. Returns HEX_EBOUNDS if the given tile
+// location specifiers are out of bounds. The unsafe variants do not perform
+// bounds-checking.
+hex_err hex_board_rctile(
   hex_board *board,
   int row, int col,
-  hex_color **space);
-hex_err hex_board_rospace(
+  hex_tile **tile);
+hex_tile *hex_board_unsafe_rctile(
+  hex_board *board,
+  int row, int col);
+hex_err hex_board_rorctile(
   const hex_board *board,
   int row, int col,
-  const hex_color **space);
-
-// Gets the coordinates of the given space. Returns HEX_EBADSPACE if the given
-// space is not part of the given board.
-hex_err hex_board_coords(
+  const hex_tile **tile);
+const hex_tile *hex_board_unsafe_rorctile(
   const hex_board *board,
-  const hex_color *space,
-  int *row, int *col);
+  int row, int col);
+hex_err hex_board_itile(
+  hex_board *board,
+  int index,
+  hex_tile **tile);
+hex_tile *hex_board_unsafe_itile(
+  hex_board *board, int index);
+hex_err hex_board_roitile(
+  const hex_board *board,
+  int index,
+  const hex_tile **tile);
+const hex_tile *hex_board_unsafe_roitile(
+  const hex_board *board,
+  int index);
 
-// Given a space on a board, gets the corresponding space on another board.
-// Returns HEX_EBADSPACE if src_space is not from src_board.
+// Gets the coordinates of the given tile or tile index. Returns HEX_EBOUNDS if
+// the given tile is not part of the given board or the tile index is out of
+// range.
+hex_err hex_board_tcoords(
+  const hex_board *board,
+  const hex_tile *tile,
+  int *row, int *col);
+hex_err hex_board_icoords(
+  const hex_board *board,
+  int index, int *row, int *col);
+
+// Given a tile on a board, gets the corresponding tile on another board.
+// Returns HEX_EBOUNDS if src_tile is not from src_board, and HEX_ESIZEMISMATCH
+// if src_board and dest_board are not the same size.
 hex_err hex_board_correlate(
   hex_board *dest_board,
-  hex_color **dest_space,
+  hex_tile **dest_tile,
   const hex_board *src_board,
-  const hex_color *src_space);
+  const hex_tile *src_tile);
 hex_err hex_board_rocorrelate(
   const hex_board *dest_board,
-  const hex_color **dest_space,
+  const hex_tile **dest_tile,
   const hex_board *src_board,
-  const hex_color *src_space);
+  const hex_tile *src_tile);
 
 // Populates the 'neighbors' array with the coordinates of the neighbors of the
-// given square, with alternating row and column values, and stores the number
-// of neighbors. The neighbors array is assumed to have enough room to store six
+// given tile, with alternating row and column values, and stores the number of
+// neighbors. The neighbors array is assumed to have enough room to store six
 // neighbors, i.e. it should be of length 12. Returns HEX_EBOUNDS if row, col
 // are out-of-bounds.
-hex_err hex_board_neighborcoords(
+hex_err hex_board_rcneighbors(
   const hex_board *board,
   int row, int col,
   int *neighbors,
   int *neighbor_count);
 
-// Populates the 'neighbors' array with pointers to the spaces neighboring the
-// given space. Returns HEX_EBADSPACE if the given space is not part of the
-// given board. The neighbors array should be of length 6.
-hex_err hex_board_neighbors(
-  hex_board *board,
-  hex_color *space,
-  hex_color **neighbors,
-  int *neighbor_count);
-hex_err hex_board_roneighbors(
+// Populates the 'neighbors' array with the indices of the neighbors of the
+// given tile. The neighbors array is assumed to have enough room to store six
+// neighbors, i.e. it should be of length 6. Returns HEX_EBOUNDS if index is
+// out-of-bounds.
+hex_err hex_board_ineighbors(
   const hex_board *board,
-  const hex_color *space,
-  const hex_color **neighbors,
+  int index,
+  int *neighbors,
+  int *neighbor_count);
+
+// Populates the 'neighbors' array with pointers to the tiles neighboring the
+// given tile. Returns HEX_EBOUNDS if the given space is not part of the given
+// board. The neighbors array should be of length 6.
+hex_err hex_board_tneighbors(
+  hex_board *board,
+  hex_tile *tile,
+  hex_tile **neighbors,
+  int *neighbor_count);
+hex_err hex_board_rotneighbors(
+  const hex_board *board,
+  const hex_tile *tile,
+  const hex_tile **neighbors,
   int *neighbor_count);
 
 // Clears the given board, resetting it to its initial state.
@@ -148,5 +203,12 @@ hex_err hex_board_copy(hex_board *dest, const hex_board *src);
 // winner. Assumes that the top and bottom edges of the board belong to red, and
 // the left and right edges belong to blue.
 hex_err hex_board_getwinner(const hex_board *board, hex_color *winner);
+
+// Gets a pointer to the color of the given tile.
+hex_color *hex_tile_color(hex_tile *tile);
+const hex_color *hex_tile_rocolor(const hex_tile *tile);
+
+// True if a given tile is free
+#define hex_tile_free(t) (*hex_tile_color(t) == HEX_COLOR_NONE)
 
 #endif

@@ -25,7 +25,7 @@ hex_err hex_board_dump(const hex_board *board, char *buf, size_t buf_len)
 
   int len = board->size * board->size;
   for (int k = 0; k < len; k++) {
-    switch (board->data[k]) {
+    switch (board->data[k].color) {
     case HEX_COLOR_RED:
       buf[k] = 'r';
       break;
@@ -52,21 +52,21 @@ size_t hex_board_dumpsize(const hex_board *board)
 hex_err hex_board_scan(hex_board *board, const char *buf)
 {
   int remaining = board->size * board->size;
-  hex_color *ptr = board->data;
+  hex_tile *ptr = board->data;
   while (remaining --> 0) {
     switch (*(buf++)) {
     case 'r':
     case 'R':
-      *(ptr++) = HEX_COLOR_RED;
+      (ptr++)->color = HEX_COLOR_RED;
       break;
     case 'b':
     case 'B':
-      *(ptr++) = HEX_COLOR_BLUE;
+      (ptr++)->color = HEX_COLOR_BLUE;
       break;
     case '\0':
       return HEX_ESIZEMISMATCH;
     default:
-      *(ptr++) = HEX_COLOR_NONE;
+      (ptr++)->color = HEX_COLOR_NONE;
       break;
     }
   }

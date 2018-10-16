@@ -206,7 +206,7 @@ int hex_board_get_method(
   hex_board *self;
   int row, col;
   hex_err err;
-  hex_color *color;
+  hex_tile *tile;
 
   TCLTRY(hex_context_to_board(objectContext, &self));
 
@@ -216,14 +216,14 @@ int hex_board_get_method(
   }
 
   TCLTRY(hex_arg_coords(interp, objv[2], &row, &col));
-  if ((err = hex_board_space(self, row, col, &color)) != HEX_OK) {
+  if ((err = hex_board_rctile(self, row, col, &tile)) != HEX_OK) {
     Tcl_SetObjResult(interp, Tcl_ObjPrintf(
                        "coordinates {%d %d} out of bounds for size %d",
                        row, col, hex_board_size(self)));
     return TCL_ERROR;
   }
 
-  Tcl_SetObjResult(interp, hex_color_to_obj(*color));
+  Tcl_SetObjResult(interp, hex_color_to_obj(*hex_tile_color(tile)));
   return TCL_OK;
 }
 
@@ -238,6 +238,7 @@ int hex_board_set_method(
   hex_board *self;
   int row, col;
   hex_err err;
+  hex_tile *tile;
   hex_color *color;
   char *new_color;
 
@@ -249,13 +250,14 @@ int hex_board_set_method(
   }
 
   TCLTRY(hex_arg_coords(interp, objv[2], &row, &col));
-  if ((err = hex_board_space(self, row, col, &color)) != HEX_OK) {
+  if ((err = hex_board_rctile(self, row, col, &tile)) != HEX_OK) {
     Tcl_SetObjResult(interp, Tcl_ObjPrintf(
                        "coordinates {%d %d} out of bounds for size %d",
                        row, col, hex_board_size(self)));
     return TCL_ERROR;
   }
 
+  color = hex_tile_color(tile);
   new_color = Tcl_GetString(objv[3]);
   if (strcmp("red", new_color) == 0
       || strcmp("r", new_color) == 0) {
@@ -306,7 +308,7 @@ int hex_board_neighbors_method(
   }
 
   TCLTRY(hex_arg_coords(interp, objv[2], &row, &col));
-  if ((err = hex_board_neighborcoords(
+  if ((err = hex_board_rcneighbors(
          self,
          row, col,
          neighbors, &neighbor_count))

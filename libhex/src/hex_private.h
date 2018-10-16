@@ -19,9 +19,13 @@
 
 #include <hex/hex.h>
 
+struct hex_tile_s {
+  hex_color color;
+};
+
 struct hex_board_s {
   int size;
-  hex_color data[0];
+  hex_tile data[0];
 };
 
 #define __HEX_GENSYM2(x,y) x##y

@@ -35,7 +35,7 @@ void dummy_move(void *data, char *board, int *row, int *col)
 {
   dummy_state *state = data;
   hex_err err;
-  hex_color *space;
+  hex_tile *tile;
   int size = hex_board_size(state->board);
 
   if ((err = hex_board_scan(state->board, board)) != HEX_OK) {
@@ -46,20 +46,18 @@ void dummy_move(void *data, char *board, int *row, int *col)
   // find the first empty space and play in it
   for (int c = 0; c < size; c++) {
     for (int r = 0; r < size; r++) {
+      int cc, rr;
       if (state->host->color == 'r') {
-        hex_board_space(state->board, r, c, &space);
-        if (*space == HEX_COLOR_NONE) {
-          *row = r;
-          *col = c;
-          return;
-        }
+        rr = r; cc = c;
       } else {
-        hex_board_space(state->board, c, r, &space);
-        if (*space == HEX_COLOR_NONE) {
-          *row = c;
-          *col = r;
-          return;
-        }
+        rr = c; cc = r;
+      }
+
+      hex_board_rctile(state->board, rr, cc, &tile);
+      if (hex_tile_free(tile)) {
+        *row = rr;
+        *col = cc;
+        return;
       }
     }
   }
