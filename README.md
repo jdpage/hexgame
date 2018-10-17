@@ -6,25 +6,43 @@ An in-progress implementation of
 pluggable AIs. Write your own and submit a PR!
 
 
-hextk
------
+Core Components
+---------------
+
+### hextk
 
 A Tk-based GUI program for playing Hex with zero, one, or two AI players. Uses
 the *hexmon* program to actually play games.
 
 
-hexmon
-------
+### hexmon
 
 A host program for Hex AIs, used as a backend for *hextk*.
 
 
-libhex
-------
+### libhex
 
 A C library / Tcl extension providing an implementation of a Hex board. This is
 the implementation used by the game host, but AI implementations may also choose
 to use it.
+
+
+AI Implementations
+------------------
+
+Listed in alphabetical order.
+
+
+### disruptor
+
+Doesn't play especially well, as it only does one move of lookahead. At least
+it's better than dummy. By Jonathan Page.
+
+
+### dummy
+
+Plays particularly badly. Originally written to test *hexmon*, before there were
+any other implementations. Anybody could have written it and sadly, someone did.
 
 
 Architecture
