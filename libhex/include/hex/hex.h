@@ -196,8 +196,15 @@ hex_err hex_board_rotneighbors(
 void hex_board_clear(hex_board *board);
 
 // Copies the data from one board to another board. Returns HEX_ESIZEMISMATCH if
-// the boards are not the same size.
+// the boards are not the same size. If src and dest point to the same board,
+// this is a no-op.
 hex_err hex_board_copy(hex_board *dest, const hex_board *src);
+
+// Updates dest to be a flipped copy of src, i.e. the row/column axes have been
+// exchanged, and red/blue have been switched. Returns HEX_ESIZEMISMATCH if the
+// boards are not the same size, and HEX_EBOUNDS if src and dest are the same
+// pointer.
+hex_err hex_board_flipcopy(hex_board *dest, const hex_board *src);
 
 // Gets the winner of the board, if any. Result is HEX_COLOR_NONE if there is no
 // winner. Assumes that the top and bottom edges of the board belong to red, and

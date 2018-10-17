@@ -413,6 +413,40 @@ hex_err hex_board_copy(hex_board *dest, const hex_board *src)
 }
 
 
+hex_err hex_board_flipcopy(hex_board *dest, const hex_board *src)
+{
+  if (dest == src) {
+    return HEX_EBOUNDS;
+  }
+
+  if (dest->size != src->size) {
+    return HEX_ESIZEMISMATCH;
+  }
+
+  for (int c = 0; c < src->size; c++) {
+    for (int r = 0; r < src->size; r++) {
+      hex_tile *to = hex_board_unsafe_rctile(dest, r, c);
+      const hex_tile *from = hex_board_unsafe_rorctile(src, c, r);
+
+      switch (from->color) {
+      case HEX_COLOR_RED:
+        to->color = HEX_COLOR_BLUE;
+        break;
+
+      case HEX_COLOR_BLUE:
+        to->color = HEX_COLOR_RED;
+        break;
+
+      default:
+        to->color = from->color;
+      }
+    }
+  }
+
+  return HEX_OK;
+}
+
+
 hex_color *hex_tile_color(hex_tile *tile)
 {
   return &tile->color;
