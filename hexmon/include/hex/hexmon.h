@@ -21,7 +21,7 @@
 // Information about the host process and current game. The pointer passed to
 // the init function is valid for the entire life of the process, so AIs may
 // store the pointer for later use if they wish.
-typedef struct {
+typedef struct hex_host_info_s {
   // Additional arguments passed on command line, starting with the path to the
   // module.
   char **optv;
@@ -37,7 +37,7 @@ typedef struct {
 
 // Information about how to call the AI. The init function is expected to
 // populate this structure.
-typedef struct {
+typedef struct hex_ai_info_s {
   // A user-defined pointer for storing state data. Will be passed as the data
   // argument to callbacks. May be left NULL.
   void *data;
