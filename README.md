@@ -36,13 +36,14 @@ Listed in alphabetical order.
 ### disruptor
 
 Doesn't play especially well, as it only does one move of lookahead. At least
-it's better than dummy. By Jonathan Page.
+it's better than dummy. Written by Jonathan Page in Chicken Scheme.
 
 
 ### dummy
 
 Plays particularly badly. Originally written to test *hexmon*, before there were
-any other implementations. Anybody could have written it and sadly, someone did.
+any other implementations. Anybody could have written it and sadly, someone did,
+in C.
 
 
 Architecture
