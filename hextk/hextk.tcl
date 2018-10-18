@@ -35,8 +35,6 @@ for {set a 0} {$a <= 360} {incr a 30} {
     set stsin($a) [expr {sin($ang)}]
 }
 
-set gamescale 2.0
-
 array set color {}
 set color(empty) white
 set color(red) red
