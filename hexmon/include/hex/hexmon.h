@@ -51,7 +51,8 @@ typedef struct hex_ai_info_s {
     int *row, int *col);
 
   // Called when the game ends. May be NULL. The board argument contains the
-  // final board state.
+  // final board state. The implementation may terminate the process if desired
+  // or convenient.
   void (*destroy_callback)(
     void *data,
     char *board);
