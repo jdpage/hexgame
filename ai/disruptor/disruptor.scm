@@ -18,18 +18,32 @@
 (use srfi-1)
 
 (define ((ai-move size color) board)
-  ;; for simplicity, all the pathing code calculates paths for the blue player.
-  ;; Therefore we need a representation of the board as if we were playing blue,
-  ;; and one as if they were playing blue.
-  (let* ((my-board (my-blue-board color board))
-         (their-board (hex/board-flip my-board))
-         (bb (best-blue-candidates my-board))
-         (wb (map hex/tile-flip (worst-red-candidates their-board)))
-         (cb (lset-intersection hex/tile-equal? bb wb)))
-    (hex/tile-coords
-     (my-unblue-tile color
-                     (choose (find (compose not null?)
-                                   (list cb wb bb)))))))
+  (if (hex/board-empty? board)
+      ;; if the board is empty, just play near the middle. If we don't
+      ;; special-case this, every single square is up for consideration, which
+      ;; takes a while on larger boards, all to just pick a random square, which
+      ;; might be near the edge. Note that some tiles will be in the selection
+      ;; pool repeatedly (on a large enough board, center tile 7 times, inner
+      ;; ring 3 times each, outer ring 1 or 2 times each). This is intended, for
+      ;; weighting.
+      (let* ((m (inexact->exact (floor (/ size 2))))
+             (s1 (list (hex/board-tile board m m)))
+             (s2 (append-map! hex/tile-neighbors s1))
+             (s3 (append-map! hex/tile-neighbors s2)))
+        (hex/tile-coords (choose (append! s1 s2 s3))))
+
+      ;; for simplicity, all the pathing code calculates paths for the blue
+      ;; player. Therefore we need a representation of the board as if we were
+      ;; playing blue, and one as if they were playing blue.
+      (let* ((my-board (my-blue-board color board))
+             (their-board (hex/board-flip my-board))
+             (bb (best-blue-candidates my-board))
+             (wb (map hex/tile-flip (worst-red-candidates their-board)))
+             (cb (lset-intersection hex/tile-equal? bb wb)))
+        (hex/tile-coords
+         (my-unblue-tile color
+                         (choose (find (compose not null?)
+                                       (list cb wb bb))))))))
 
 (define (my-blue-board my-color board)
   (if (eq? my-color 'blue)

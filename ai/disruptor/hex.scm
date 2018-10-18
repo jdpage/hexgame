@@ -88,6 +88,9 @@
 (define hex/board-clear
   (foreign-lambda void "hex_board_clear" hex/board))
 
+(define hex/board-empty?
+  (foreign-lambda bool "hex_board_is_empty" hex/board))
+
 (define (hex/board-copy dest src)
   (let ((err ((foreign-lambda (enum hex_err_e) "hex_board_copy" hex/board hex/board)
               dest src)))
