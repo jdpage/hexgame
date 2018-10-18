@@ -169,6 +169,19 @@ int hex_board_index_count(const hex_board *board)
 int hex_board_sindex_count(int size) { return size * size; }
 
 
+int hex_board_is_empty(const hex_board *board)
+{
+  int count = hex_board_index_count(board);
+  for (int k = 0; k < count; k++) {
+    if (hex_board_unsafe_roitile(board, k)->color != HEX_COLOR_NONE) {
+      return 0;
+    }
+  }
+
+  return 1;
+}
+
+
 hex_err hex_board_rctile(
   hex_board *board,
   int row, int col,

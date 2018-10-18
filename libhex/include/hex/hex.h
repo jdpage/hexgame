@@ -101,6 +101,9 @@ size_t hex_board_dumpsize(const hex_board *board);
 // to be an empty space.
 hex_err hex_board_scan(hex_board *board, const char *buf);
 
+// Returns 0 if the board is empty, and nonzero otherwise.
+int hex_board_is_empty(const hex_board *board);
+
 // Gets a pointer to a tile on the board. Returns HEX_EBOUNDS if the given tile
 // location specifiers are out of bounds. The unsafe variants do not perform
 // bounds-checking.
