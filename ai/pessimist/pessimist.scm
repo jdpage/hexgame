@@ -15,7 +15,7 @@
 ;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 (declare (uses hex tictoc))
-(use srfi-1 srfi-69 data-structures)
+(use srfi-1 data-structures)
 (import tictoc)
 
 (define ((ai-move size color) board)
@@ -77,6 +77,12 @@
  (define (min+ key lst)
    (reduce (lambda (a b) (if (< (key b) (key a)) b a)) #f lst))
 
+ (define (lmin lst)
+   (reduce min +inf.0 lst))
+
+ (define (lmax lst)
+   (reduce max 0 lst))
+
  (define (mins+ key lst)
    (fold
     (lambda (e r)
@@ -96,8 +102,9 @@
        (vector-ref scores (hex/tile-index t)))
      (define (update-score! t s)
        (vector-set! scores (hex/tile-index t) (min s (score-ref t))))
-     (define (min-score tiles)
-       (min+ score-ref tiles))
+     (profiled
+      (define (min-score tiles)
+        (min+ score-ref tiles)))
 
      (for-each (lambda (t)
                  (update-score! t (blue-distance t)))
@@ -113,45 +120,12 @@
                (next (delete! current unvisited))))
            scores))))
 
- ;; Returns a list of the shortest paths through the board for the blue player
- (define (shortest-blue-paths board scores)
-   (profiled
-    (define (score-ref t)
-      (vector-ref scores (hex/tile-index t)))
-
-    (define (best-scores! ts)
-      (map! car
-            (filter!
-             (lambda (t) (< (cdr t) +inf.0))
-             (mins+ cdr (map! (lambda (t) (cons t (score-ref t))) ts))))))
-
-   (let ((done '()))
-     (let next ((paths (map! list (best-scores! (right-edge-tiles board)))))
-       (if (null? paths)
-           done
-           (next
-            (append-map!
-             (lambda (p)
-               (if (left-edge? (car p))
-                   (begin
-                     (set! done (cons p done))
-                     '())
-                   (map! (cut cons <> p)
-                         (lset-difference! hex/tile-equal?
-                                           (best-scores!
-                                            (hex/tile-neighbors (car p)))
-                                           p))))
-             paths))))))
-
- (define (path-cost scores path)
-   (define (score-ref t)
-     (vector-ref scores (hex/tile-index t)))
-   (last (map score-ref path)))
-
- (define (shortest-blue-path-cost board)
+ (define (xest-blue-path-cost sel board)
    (let ((scores (score-blue-paths board)))
-     (apply min (map (lambda (t) (vector-ref scores (hex/tile-index t)))
-                     (right-edge-tiles board)))))
+     (sel
+      (filter! (compose not (cut = +inf.0 <>))
+               (map! (lambda (t) (vector-ref scores (hex/tile-index t)))
+                     (right-edge-tiles board))))))
 
  (define (choose lst)
    (list-ref lst (random (length lst))))
@@ -170,16 +144,10 @@
  (define (blue-candidates board)
    (filter!
     (lambda (t) (not (hex/tile-color-ref t)))
-    (fast-tile-union board
-                     (shortest-blue-paths board (score-blue-paths board)))))
+    (hex/board-tiles board)))
 
- ;; (define (blue-candidates board)
- ;;   (filter!
- ;;    (lambda (t) (not (hex/tile-color-ref t)))
- ;;    (hex/board-tiles board)))
-
- ;; return a list of the best places for blue to play in order to minimise
- ;; blue's path costs
+ ;; return a list of places for blue to play which minimise its maximum path
+ ;; costs.
  (define (best-blue-candidates board)
    (map car
         (mins+ cdr
@@ -188,10 +156,11 @@
                      (lambda (b t)
                        (cons
                         (hex/tile-correlate t board)
-                        (shortest-blue-path-cost b))))
+                        (xest-blue-path-cost lmax b))))
                 (blue-candidates board)))))
 
- ;; return a list of places red should play to maximise blue's path costs
+ ;; return a list of places red should play to maximise blue's minimum path
+ ;; costs
  (define (worst-red-candidates board)
    (map car
         (maxs+ cdr
@@ -200,7 +169,7 @@
                      (lambda (b t)
                        (cons
                         (hex/tile-correlate t board)
-                        (shortest-blue-path-cost b))))
+                        (xest-blue-path-cost lmin b))))
                 (blue-candidates board))))))
 
 
@@ -224,7 +193,7 @@ void destroy_callback_w(void *move, char *board)
   destroy_callback();
 }
 
-void disruptor_ai_init(hex_host_info *host, hex_ai_info *ai)
+void pessimist_ai_init(hex_host_info *host, hex_ai_info *ai)
 {
   C_word heap, stack, symbols;
   CHICKEN_parse_command_line(host->optc, host->optv, &heap, &stack, &symbols);
