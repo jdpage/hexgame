@@ -122,7 +122,7 @@ function (add_chicken_library name type)
   set (CHICKEN_TARGET_PARAM_ONE_VALUE_KEYWORDS)
   set (CHICKEN_TARGET_PARAM_MULTI_VALUE_KEYWORDS
     EMIT_IMPORT_LIBRARIES
-    # IMPORTS
+    IMPORTS
     )
   cmake_parse_arguments(
     CHICKEN_TARGET_ARG
@@ -144,12 +144,13 @@ function (add_chicken_library name type)
     endforeach ()
   endif ()
 
-  # if (DEFINED CHICKEN_TARGET_ARG_IMPORTS)
-  #   foreach (import ${CHICKEN_TARGET_ARG_IMPORTS})
-  #     list (APPEND myflags -extend "${CMAKE_BINARY_DIR}/chicken_imports/${import}.import.scm")
-  #     list (APPEND import_depends "${CMAKE_BINARY_DIR}/chicken_imports/${import}.import.scm")
-  #   endforeach ()
-  # endif ()
+  if (DEFINED CHICKEN_TARGET_ARG_IMPORTS)
+    foreach (import ${CHICKEN_TARGET_ARG_IMPORTS})
+      list (APPEND myflags -extend "${CMAKE_BINARY_DIR}/chicken_imports/${import}.import.scm")
+      list (APPEND myflags -types "${CMAKE_BINARY_DIR}/chicken_imports/${import}.types")
+      list (APPEND import_depends "${CMAKE_BINARY_DIR}/chicken_imports/${import}.import.scm")
+    endforeach ()
+  endif ()
 
   if (${CHICKEN_TARGET_ARG_EMBEDDED})
     list (APPEND myflags -e)
@@ -183,8 +184,8 @@ function (add_chicken_library name type)
     list (APPEND CHICKEN_GENERATED_SOURCES ${output})
 
     add_custom_command (
-      OUTPUT "${output}" ${import_outputs}
-      COMMAND ${Chicken_CSC_EXECUTABLE} ${myflags} -t "${input}" -o "${output}"
+      OUTPUT "${output}" ${import_outputs} "${CMAKE_BINARY_DIR}/chicken_imports/${stem}.types"
+      COMMAND ${Chicken_CSC_EXECUTABLE} ${myflags} -t "${input}" -o "${output}" -emit-type-file "${stem}.types"
       MAIN_DEPENDENCY "${src}"
       DEPENDS ${import_depends}
       WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/chicken_imports")

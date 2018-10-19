@@ -1,5 +1,6 @@
 add_chicken_library (scheme_hex STATIC
   hex.scm
+  EMIT_IMPORT_LIBRARIES hex
   EMBEDDED)
 target_link_libraries (scheme_hex PUBLIC hex)
 

@@ -16,10 +16,10 @@
 
 (declare (uses hex tictoc))
 (use srfi-1 data-structures)
-(import tictoc)
+(import hex tictoc)
 
 (define ((ai-move size color) board)
-  (if (hex/board-empty? board)
+  (if (hexboard-empty? board)
       ;; if the board is empty, just play near the middle. If we don't
       ;; special-case this, every single square is up for consideration, which
       ;; takes a while on larger boards, all to just pick a random square, which
@@ -28,20 +28,20 @@
       ;; ring 3 times each, outer ring 1 or 2 times each). This is intended, for
       ;; weighting.
       (let* ((m (inexact->exact (floor (/ size 2))))
-             (s1 (list (hex/board-tile board m m)))
-             (s2 (append-map! hex/tile-neighbors s1))
-             (s3 (append-map! hex/tile-neighbors s2)))
-        (hex/tile-coords (choose (append! s1 s2 s3))))
+             (s1 (list (hexboard-tile-ref board m m)))
+             (s2 (append-map! hextile-neighbors s1))
+             (s3 (append-map! hextile-neighbors s2)))
+        (hextile-coords (choose (append! s1 s2 s3))))
 
       ;; for simplicity, all the pathing code calculates paths for the blue
       ;; player. Therefore we need a representation of the board as if we were
       ;; playing blue, and one as if they were playing blue.
       (let* ((my-board (my-blue-board color board))
-             (their-board (hex/board-flip my-board))
+             (their-board (hexboard-flip my-board))
              (bb (best-blue-candidates my-board))
-             (wb (map hex/tile-flip (worst-red-candidates their-board)))
-             (cb (lset-intersection hex/tile-equal? bb wb)))
-        (hex/tile-coords
+             (wb (map hextile-flip (worst-red-candidates their-board)))
+             (cb (lset-intersection hextile-equal? bb wb)))
+        (hextile-coords
          (my-unblue-tile color
                          (choose (find (compose not null?)
                                        (list cb wb bb))))))))
@@ -50,26 +50,26 @@
  (define (my-blue-board my-color board)
    (if (eq? my-color 'blue)
        board
-       (hex/board-flip board)))
+       (hexboard-flip board)))
 
  (define (my-unblue-tile my-color tile)
    (if (eq? my-color 'blue)
        tile
-       (hex/tile-flip tile)))
+       (hextile-flip tile)))
 
  (define (left-edge-tiles board)
-   (map! (lambda (n) (hex/board-tile board n 0))
-         (iota (hex/board-size board))))
+   (map! (lambda (n) (hexboard-tile-ref board n 0))
+         (iota (hexboard-size board))))
 
  (define (right-edge-tiles board)
-   (let ((sz (hex/board-size board)))
-     (map! (lambda (n) (hex/board-tile board n (sub1 sz))) (iota sz))))
+   (let ((sz (hexboard-size board)))
+     (map! (lambda (n) (hexboard-tile-ref board n (sub1 sz))) (iota sz))))
 
  (define (left-edge? tile)
-   (receive (row col) (hex/tile-coords tile) (zero? col)))
+   (receive (row col) (hextile-coords tile) (zero? col)))
 
  (define (blue-distance t)
-   (case (hex/tile-color-ref t)
+   (case (hextile-color-ref t)
      ((blue) 0)
      ((red) +inf.0)
      (else 1)))
@@ -96,12 +96,12 @@
 
  ;; Returns a vector of path scores for the blue player
  (define (score-blue-paths board)
-   (let ((scores (make-vector (hex/board-index-count board) +inf.0)))
+   (let ((scores (make-vector (hexboard-index-count board) +inf.0)))
 
      (define (score-ref t)
-       (vector-ref scores (hex/tile-index t)))
+       (vector-ref scores (hextile-index t)))
      (define (update-score! t s)
-       (vector-set! scores (hex/tile-index t) (min s (score-ref t))))
+       (vector-set! scores (hextile-index t) (min s (score-ref t))))
      (profiled
       (define (min-score tiles)
         (min+ score-ref tiles)))
@@ -110,13 +110,13 @@
                  (update-score! t (blue-distance t)))
                (left-edge-tiles board))
 
-     (let next ((unvisited (hex/board-tiles board)))
+     (let next ((unvisited (hexboard-tiles board)))
        (if (not (null? unvisited))
            (begin
              (let ((current (min-score unvisited)))
                (for-each (lambda (n)
                            (update-score! n (+ (score-ref current) (blue-distance n))))
-                         (hex/tile-neighbors current))
+                         (hextile-neighbors current))
                (next (delete! current unvisited))))
            scores))))
 
@@ -124,7 +124,7 @@
    (let ((scores (score-blue-paths board)))
      (sel
       (filter! (compose not (cut = +inf.0 <>))
-               (map! (lambda (t) (vector-ref scores (hex/tile-index t)))
+               (map! (lambda (t) (vector-ref scores (hextile-index t)))
                      (right-edge-tiles board))))))
 
  (define (choose lst)
@@ -136,15 +136,15 @@
       (lambda (lst)
         (for-each
          (lambda (tile)
-           (hash-table-set! t (hex/tile-index tile) #t))
+           (hash-table-set! t (hextile-index tile) #t))
          lst))
       lsts)
-     (map (cut make-hex/tile board <>) (hash-table-keys t))))
+     (map (cut make-hextile board <>) (hash-table-keys t))))
 
  (define (blue-candidates board)
    (filter!
-    (lambda (t) (not (hex/tile-color-ref t)))
-    (hex/board-tiles board)))
+    (lambda (t) (not (hextile-color-ref t)))
+    (hexboard-tiles board)))
 
  ;; return a list of places for blue to play which minimise its maximum path
  ;; costs.
@@ -152,10 +152,10 @@
    (map car
         (mins+ cdr
                (map
-                (cut hex/board-with-tile board <> 'blue
+                (cut hexboard-with-tile board <> 'blue
                      (lambda (b t)
                        (cons
-                        (hex/tile-correlate t board)
+                        (hextile-correlate t board)
                         (xest-blue-path-cost lmax b))))
                 (blue-candidates board)))))
 
@@ -165,10 +165,10 @@
    (map car
         (maxs+ cdr
                (map
-                (cut hex/board-with-tile board <> 'red
+                (cut hexboard-with-tile board <> 'red
                      (lambda (b t)
                        (cons
-                        (hex/tile-correlate t board)
+                        (hextile-correlate t board)
                         (xest-blue-path-cost lmin b))))
                 (blue-candidates board))))))
 
@@ -216,7 +216,7 @@ void pessimist_ai_init(hex_host_info *host, hex_ai_info *ai)
                   ((c-pointer int) col))
   void
 
-  (receive (r c) (move-callback (hex/string->board board))
+  (receive (r c) (move-callback (string->hexboard board))
     (pointer-s32-set! row r)
     (pointer-s32-set! col c)
     (profile-collect)))

@@ -1,7 +1,8 @@
 set (CHICKENFLAGS ${CHICKENFLAGS} -e -s)
 
 add_chicken_library (disruptor MODULE
-  disruptor.scm)
+  disruptor.scm
+  IMPORTS hex tictoc)
 target_link_libraries (disruptor PRIVATE
   scheme_hex
   scheme_tictoc

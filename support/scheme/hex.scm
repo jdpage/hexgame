@@ -15,205 +15,274 @@
 ;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 (declare (unit hex))
-(use lolevel data-structures srfi-1 srfi-4)
 
-(foreign-declare "#include <hex/hex.h>")
+(module hex
+    (make-hexboard
+     hexboard?
+     make-hextile
+     hextile?
+     hextile-board
+     hextile-index
+     string->hexboard
+     hexboard-size
+     hexboard-index-count
+     hexboard->string
+     hexboard-clear
+     hexboard-empty?
+     hexboard-dup
+     hexboard-flip
+     hexboard-tile-ref
+     hexboard-tiles
+     hexboard-with-tile
+     hextile-correlate
+     hextile-color-ref
+     hextile-color-set!
+     hextile-coords
+     hextile-flip
+     hextile-equal?
+     hextile-neighbors
+     )
+  (import scheme chicken foreign)
+  (use lolevel data-structures srfi-1 srfi-4)
 
-(define-record hex/board buffer)
-(define-foreign-type hex/board scheme-pointer hex/board-buffer)
-(define-record-printer (hex/board b out)
-  (fprintf out "#,(hex/board ~s)" (hex/board->string b)))
+  (foreign-declare "#include <hex/hex.h>")
 
-(define-record hex/tile board index)
-(define-record-printer (hex/tile t out)
-  (fprintf out "#,(hex/tile ~s ~s)"
-           (hex/tile-board t)
-           (hex/tile-index t)))
+  (define-type hexboard (struct hexboard))
+  (: make-hexboard/s (blob -> hexboard))
+  (: hexboard? (* -> boolean : hexboard))
+  (: hexboard-buffer (hexboard -> blob))
+  (define-record-type hexboard
+    (make-hexboard/s buffer)
+    hexboard?
+    (buffer hexboard-buffer))
+  (define-foreign-type hexboard scheme-pointer hexboard-buffer)
+  (define-record-printer (hexboard b out)
+    (fprintf out "#,(hexboard ~s)" (hexboard->string b)))
 
-(define-syntax define-foreign-enum
-  (syntax-rules ()
-    ((define-foreign-enum e n)
-     (define n (foreign-value n (enum e))))
-    ((define-foreign-enum e n p ...)
-     (begin
-       (define-foreign-enum e n)
-       (define-foreign-enum e p ...)))))
+  (define-type hextile (struct hextile))
+  (: make-hextile (hexboard fixnum -> hextile))
+  (: hextile? (* -> boolean : hextile))
+  (: hextile-board (hextile -> hexboard))
+  (: hextile-index (hextile -> fixnum))
+  (define-record-type hextile
+    (make-hextile board index)
+    hextile?
+    (board hextile-board)
+    (index hextile-index))
+  (define-record-printer (hextile t out)
+    (fprintf out "#,(hextile ~s ~s)"
+             (hextile-board t)
+             (hextile-index t)))
 
-(define-foreign-enum hex_err_e
-  HEX_OK
-  HEX_ENOMEM
-  HEX_EBOUNDS
-  HEX_ESIZEMISMATCH
-  HEX_ESHORTBUFFER)
+  (define-syntax define-foreign-enum
+    (syntax-rules ()
+      ((define-foreign-enum e n)
+       (define n (foreign-value n (enum e))))
+      ((define-foreign-enum e n p ...)
+       (begin
+         (define-foreign-enum e n)
+         (define-foreign-enum e p ...)))))
 
-(define-foreign-enum hex_color_e
-  HEX_COLOR_NONE
-  HEX_COLOR_RED
-  HEX_COLOR_BLUE)
+  (define-foreign-enum hex_err_e
+    HEX_OK
+    HEX_ENOMEM
+    HEX_EBOUNDS
+    HEX_ESIZEMISMATCH
+    HEX_ESHORTBUFFER)
 
-(define hex/board-sizeof
-  (foreign-lambda size_t "hex_board_sizeof" int))
+  (define-foreign-enum hex_color_e
+    HEX_COLOR_NONE
+    HEX_COLOR_RED
+    HEX_COLOR_BLUE)
 
-(define (hex/make-board size)
-  (let ((b (make-hex/board (make-blob (hex/board-sizeof size)))))
-    ((foreign-lambda void "hex_board_initat" hex/board int)
-     b size)
-    b))
+  (: hexboard-sizeof (fixnum -> fixnum))
+  (define hexboard-sizeof
+    (foreign-lambda size_t "hex_board_sizeof" int))
 
-(define (hex/string->board data)
-  (let ((b (hex/make-board
-            (inexact->exact (truncate
-                             (sqrt (string-length data)))))))
-    (hex/board-scan b data)))
+  (: make-hexboard (fixnum -> hexboard))
+  (define (make-hexboard size)
+    (let ((b (make-hexboard/s (make-blob (hexboard-sizeof size)))))
+      ((foreign-lambda void "hex_board_initat" hexboard int)
+       b size)
+      b))
 
-(define hex/board-size
-  (foreign-lambda int "hex_board_size" hex/board))
+  (: string->hexboard (string -> (or hexboard false)))
+  (define (string->hexboard data)
+    (let ((b (make-hexboard
+              (inexact->exact (truncate
+                               (sqrt (string-length data)))))))
+      (hexboard-scan b data)))
 
-(define hex/board-index-count
-  (foreign-lambda int "hex_board_index_count" hex/board))
+  (: hexboard-size (hexboard -> fixnum))
+  (define hexboard-size
+    (foreign-lambda int "hex_board_size" hexboard))
 
-(define (hex/board->string board)
-  (let* ((sz ((foreign-lambda size_t "hex_board_dumpsize" hex/board) board))
-         (str (make-string (sub1 sz))))
-    ((foreign-lambda int "hex_board_dump" hex/board scheme-pointer size_t)
-     board str sz)
-    str))
+  (: hexboard-index-count (hexboard -> fixnum))
+  (define hexboard-index-count
+    (foreign-lambda int "hex_board_index_count" hexboard))
 
-(define (hex/board-scan board data)
-  (let ((err ((foreign-lambda (enum hex_err_e) "hex_board_scan" hex/board c-string)
-              board data)))
-    (cond ((eqv? err HEX_OK) board)
-          ((eqv? err HEX_ESIZEMISMATCH) #f))))
+  (: hexboard->string (hexboard -> string))
+  (define (hexboard->string board)
+    (let* ((sz ((foreign-lambda size_t "hex_board_dumpsize" hexboard) board))
+           (str (make-string (sub1 sz))))
+      ((foreign-lambda int "hex_board_dump" hexboard scheme-pointer size_t)
+       board str sz)
+      str))
 
-(define hex/board-clear
-  (foreign-lambda void "hex_board_clear" hex/board))
+  (: hexboard-scan (hexboard string -> (or hexboard false)))
+  (define (hexboard-scan board data)
+    (let ((err ((foreign-lambda (enum hex_err_e) "hex_board_scan" hexboard c-string)
+                board data)))
+      (cond ((eqv? err HEX_OK) board)
+            ((eqv? err HEX_ESIZEMISMATCH) #f))))
 
-(define hex/board-empty?
-  (foreign-lambda bool "hex_board_is_empty" hex/board))
+  (: hexboard-clear (hexboard -> undefined))
+  (define hexboard-clear
+    (foreign-lambda void "hex_board_clear" hexboard))
 
-(define (hex/board-copy dest src)
-  (let ((err ((foreign-lambda (enum hex_err_e) "hex_board_copy" hex/board hex/board)
-              dest src)))
-    (select err
-            ((HEX_OK) dest)
-            ((HEX_ESIZEMISMATCH) #f)
-            (else (abort 'exn)))))
+  (: hexboard-empty? (hexboard -> boolean))
+  (define hexboard-empty?
+    (foreign-lambda bool "hex_board_is_empty" hexboard))
 
-(define (hex/board-dup board)
-  (hex/board-copy (hex/make-board (hex/board-size board))
-                  board))
+  (: hexboard-copy (hexboard hexboard -> (or hexboard false)))
+  (define (hexboard-copy dest src)
+    (let ((err ((foreign-lambda (enum hex_err_e) "hex_board_copy" hexboard hexboard)
+                dest src)))
+      (select err
+              ((HEX_OK) dest)
+              ((HEX_ESIZEMISMATCH) #f)
+              (else (abort 'exn)))))
 
-(define (hex/board-flip board)
-  (let ((b (hex/make-board (hex/board-size board))))
-    ((foreign-lambda (enum hex_err_e) "hex_board_flipcopy" hex/board hex/board)
-     b board)
-    b))
+  (: hexboard-dup (hexboard -> hexboard))
+  (define (hexboard-dup board)
+    (hexboard-copy (make-hexboard (hexboard-size board))
+                   board))
 
-(define (hex/color->object color)
-  (select color
-          ((HEX_COLOR_RED) 'red)
-          ((HEX_COLOR_BLUE) 'blue)
-          (else #f)))
+  (: hexboard-flip (hexboard -> hexboard))
+  (define (hexboard-flip board)
+    (let ((b (make-hexboard (hexboard-size board))))
+      ((foreign-lambda (enum hex_err_e) "hex_board_flipcopy" hexboard hexboard)
+       b board)
+      b))
 
-(define (hex/object->color color)
-  (case color
-    ((#f) HEX_COLOR_NONE)
-    ((red) HEX_COLOR_RED)
-    ((blue) HEX_COLOR_BLUE)))
+  (: hexcolor->object (fixnum -> (or symbol false)))
+  (define (hexcolor->object color)
+    (select color
+            ((HEX_COLOR_RED) 'red)
+            ((HEX_COLOR_BLUE) 'blue)
+            (else #f)))
 
-(define (hex/board-tile board r c)
-  (let-location
-   ((index int))
-   (let ((err ((foreign-lambda (enum hex_err_e) "hex_board_index"
-                               hex/board int int (c-pointer int))
-               board r c (location index))))
-     (select err
-             ((HEX_EBOUNDS) (abort '(exn bounds)))
-             ((HEX_OK) (make-hex/tile board index))))))
+  (: object->hexcolor ((or symbol false) -> fixnum))
+  (define (object->hexcolor color)
+    (case color
+      ((#f) HEX_COLOR_NONE)
+      ((red) HEX_COLOR_RED)
+      ((blue) HEX_COLOR_BLUE)))
 
-(define (hex/board-tiles board)
-  (map (cut make-hex/tile board <>) (iota (hex/board-index-count board))))
+  (: hexboard-tile-ref (hexboard fixnum fixnum -> hextile))
+  (define (hexboard-tile-ref board r c)
+    (let-location
+     ((index int))
+     (let ((err ((foreign-lambda (enum hex_err_e) "hex_board_index"
+                                 hexboard int int (c-pointer int))
+                 board r c (location index))))
+       (select err
+               ((HEX_EBOUNDS) (abort '(exn bounds)))
+               ((HEX_OK) (make-hextile board index))))))
 
-(define (hex/board-with-tile board tile color cont)
-  (let* ((b (hex/board-dup board))
-         (t (hex/tile-correlate tile b)))
-    (set! (hex/tile-color-ref t) color)
-    (cont b t)))
+  (: hexboard-tiles (hexboard -> (list-of hextile)))
+  (define (hexboard-tiles board)
+    (map (cut make-hextile board <>) (iota (hexboard-index-count board))))
 
-(define (hex/tile-correlate tile board)
-  (make-hex/tile board (hex/tile-index tile)))
+  (: hexboard-with-tile (forall (t) (hexboard hextile (or symbol false) (hexboard hextile -> t) -> t)))
+  (define (hexboard-with-tile board tile color cont)
+    (let* ((b (hexboard-dup board))
+           (t (hextile-correlate tile b)))
+      (set! (hextile-color-ref t) color)
+      (cont b t)))
 
-(define (hex/tile-color-ref tile)
-  (let-location
-   ((color int))
-   (let ((err ((foreign-lambda*
-                (enum hex_err_e) ((hex/board board)
-                                  (int index)
-                                  ((c-pointer int) ptr))
-                "hex_tile *tile;"
-                "hex_err e = hex_board_itile(board, index, &tile);"
-                "if (e == HEX_OK) *ptr = *hex_tile_color(tile);"
-                "C_return(e);")
-               (hex/tile-board tile)
-               (hex/tile-index tile)
-               (location color))))
-     (select err
-             ((HEX_EBOUNDS) (abort '(exn bounds)))
-             ((HEX_OK) (hex/color->object color))
-             (else (abort 'exn))))))
+  (: hextile-correlate (hextile hexboard -> hextile))
+  (define (hextile-correlate tile board)
+    (make-hextile board (hextile-index tile)))
 
-(define (hex/tile-color-set! tile color)
-  (let ((err ((foreign-lambda*
-               (enum hex_err_e) ((hex/board board)
-                                 (int index)
-                                 ((enum hex_color_e) c))
-               "hex_tile *tile;"
-               "hex_err e = hex_board_itile(board, index, &tile);"
-               "if (e == HEX_OK) *hex_tile_color(tile) = c;"
-               "C_return(e);")
-              (hex/tile-board tile)
-              (hex/tile-index tile)
-              (hex/object->color color))))
-    (select err
-            ((HEX_EBOUNDS) (abort '(exn bounds)))
-            ((HEX_OK) (hex/color->object color))
-            (else (abort 'exn)))))
+  (: hextile-color-ref (hextile -> (or symbol false)))
+  (define (hextile-color-ref tile)
+    (let-location
+     ((color int))
+     (let ((err ((foreign-lambda*
+                  (enum hex_err_e) ((hexboard board)
+                                    (int index)
+                                    ((c-pointer int) ptr))
+                  "hex_tile *tile;"
+                  "hex_err e = hex_board_itile(board, index, &tile);"
+                  "if (e == HEX_OK) *ptr = *hex_tile_color(tile);"
+                  "C_return(e);")
+                 (hextile-board tile)
+                 (hextile-index tile)
+                 (location color))))
+       (select err
+               ((HEX_EBOUNDS) (abort '(exn bounds)))
+               ((HEX_OK) (hexcolor->object color))
+               (else (abort 'exn))))))
 
-(set! (setter hex/tile-color-ref) hex/tile-color-set!)
+  (: hextile-color-set! (hextile (or symbol false) -> undefined))
+  (define (hextile-color-set! tile color)
+    (let ((err ((foreign-lambda*
+                 (enum hex_err_e) ((hexboard board)
+                                   (int index)
+                                   ((enum hex_color_e) c))
+                 "hex_tile *tile;"
+                 "hex_err e = hex_board_itile(board, index, &tile);"
+                 "if (e == HEX_OK) *hex_tile_color(tile) = c;"
+                 "C_return(e);")
+                (hextile-board tile)
+                (hextile-index tile)
+                (object->hexcolor color))))
+      (select err
+              ((HEX_EBOUNDS) (abort '(exn bounds)))
+              ((HEX_OK))
+              (else (abort 'exn)))))
 
-(define (hex/tile-coords tile)
-  (let-location
-   ((row int) (col int))
-   (let ((err ((foreign-lambda (enum hex_err_e) "hex_board_icoords"
-                               hex/board int (c-pointer int) (c-pointer int))
-               (hex/tile-board tile) (hex/tile-index tile)
-               (location row) (location col))))
-     (select err
-             ((HEX_EBOUNDS) (abort '(exn bounds)))
-             ((HEX_OK) (values row col))
-             (else (abort 'exn))))))
+  (set! (setter hextile-color-ref) hextile-color-set!)
 
-(define (hex/tile-flip tile)
-  (let-values (((board) (hex/board-flip (hex/tile-board tile)))
-               ((r c) (hex/tile-coords tile)))
-    (hex/board-tile board c r)))
+  (: hextile-coords (hextile -> fixnum fixnum))
+  (define (hextile-coords tile)
+    (let-location
+     ((row int) (col int))
+     (let ((err ((foreign-lambda (enum hex_err_e) "hex_board_icoords"
+                                 hexboard int (c-pointer int) (c-pointer int))
+                 (hextile-board tile) (hextile-index tile)
+                 (location row) (location col))))
+       (select err
+               ((HEX_EBOUNDS) (abort '(exn bounds)))
+               ((HEX_OK) (values row col))
+               (else (abort 'exn))))))
 
-(define (hex/tile-equal? a b)
-  (= (hex/tile-index a) (hex/tile-index b)))
+  (: hextile-flip (hextile -> hextile))
+  (define (hextile-flip tile)
+    (let-values (((board) (hexboard-flip (hextile-board tile)))
+                 ((r c) (hextile-coords tile)))
+      (hexboard-tile-ref board c r)))
 
-(define (hex/tile-neighbors tile)
-  (let-location
-   ((count int))
-   (let* ((ns (make-s32vector 6))
-          (err ((foreign-lambda (enum hex_err_e) "hex_board_ineighbors"
-                                hex/board int s32vector (c-pointer int))
-                (hex/tile-board tile)
-                (hex/tile-index tile)
-                ns
-                (location count))))
-     (select err
-             ((HEX_EBOUNDS) (abort '(exn bounds)))
-             ((HEX_OK)
-              (map (lambda (index) (make-hex/tile (hex/tile-board tile) index))
-                   (s32vector->list (subs32vector ns 0 count))))
-             (else (abort 'exn))))))
+  (: hextile-equal? (hextile hextile -> boolean))
+  (define (hextile-equal? a b)
+    (= (hextile-index a) (hextile-index b)))
+
+  (: hextile-neighbors (hextile -> (list-of hextile)))
+  (define (hextile-neighbors tile)
+    (let-location
+     ((count int))
+     (let* ((ns (make-s32vector 6))
+            (err ((foreign-lambda (enum hex_err_e) "hex_board_ineighbors"
+                                  hexboard int s32vector (c-pointer int))
+                  (hextile-board tile)
+                  (hextile-index tile)
+                  ns
+                  (location count))))
+       (select err
+               ((HEX_EBOUNDS) (abort '(exn bounds)))
+               ((HEX_OK)
+                (map (lambda (index) (make-hextile (hextile-board tile) index))
+                     (s32vector->list (subs32vector ns 0 count))))
+               (else (abort 'exn))))))
+  )
