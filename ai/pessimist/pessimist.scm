@@ -1,4 +1,4 @@
-;; "disruptor" Hex AI
+;; "pessimist" Hex AI
 ;; Copyright (C) 2018  Jonathan David Page <jonathan@sleepingcyb.org>
 ;;
 ;; This program is free software: you can redistribute it and/or modify
@@ -14,9 +14,9 @@
 ;; You should have received a copy of the GNU General Public License
 ;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-(declare (uses hex tictoc))
-(use srfi-1 data-structures)
-(import hex tictoc)
+(declare (uses hex tictoc pathtools))
+;; (use srfi-1 data-structures)
+(import hex tictoc pathtools)
 
 (define ((ai-move size color) board)
   (if (hexboard-empty? board)
@@ -47,85 +47,6 @@
                                        (list cb wb bb))))))))
 
 (profiled
- (define (my-blue-board my-color board)
-   (if (eq? my-color 'blue)
-       board
-       (hexboard-flip board)))
-
- (define (my-unblue-tile my-color tile)
-   (if (eq? my-color 'blue)
-       tile
-       (hextile-flip tile)))
-
- (define (left-edge-tiles board)
-   (map! (lambda (n) (hexboard-tile-ref board n 0))
-         (iota (hexboard-size board))))
-
- (define (right-edge-tiles board)
-   (let ((sz (hexboard-size board)))
-     (map! (lambda (n) (hexboard-tile-ref board n (sub1 sz))) (iota sz))))
-
- (define (left-edge? tile)
-   (receive (row col) (hextile-coords tile) (zero? col)))
-
- (define (blue-distance t)
-   (case (hextile-color-ref t)
-     ((blue) 0)
-     ((red) +inf.0)
-     (else 1)))
-
- (define (min+ key lst)
-   (reduce (lambda (a b) (if (< (key b) (key a)) b a)) #f lst))
-
- (define (lmin lst)
-   (reduce min +inf.0 lst))
-
- (define (lmax lst)
-   (reduce max 0 lst))
-
- (define (mins+ key lst)
-   (fold
-    (lambda (e r)
-      (cond ((or (null? r) (= (key (car r)) (key e))) (cons e r))
-            ((< (key e) (key (car r))) (list e))
-            (else r)))
-    '() lst))
-
- (define (maxs+ key lst)
-   (mins+ (compose - key) lst))
-
- ;; Returns a vector of path scores for the blue player
- (define (score-blue-paths board)
-   (let ((scores (make-vector (hexboard-index-count board) +inf.0)))
-
-     (define (score-ref t)
-       (vector-ref scores (hextile-index t)))
-     (define (update-score! t s)
-       (vector-set! scores (hextile-index t) (min s (score-ref t))))
-     (profiled
-      (define (min-score tiles)
-        (min+ score-ref tiles)))
-
-     (for-each (lambda (t)
-                 (update-score! t (blue-distance t)))
-               (left-edge-tiles board))
-
-     (let next ((unvisited (hexboard-tiles board)))
-       (if (not (null? unvisited))
-           (begin
-             (let ((current (min-score unvisited)))
-               (for-each (lambda (n)
-                           (update-score! n (+ (score-ref current) (blue-distance n))))
-                         (hextile-neighbors current))
-               (next (delete! current unvisited))))
-           scores))))
-
- (define (xest-blue-path-cost sel board)
-   (let ((scores (score-blue-paths board)))
-     (sel
-      (filter! (compose not (cut = +inf.0 <>))
-               (map! (lambda (t) (vector-ref scores (hextile-index t)))
-                     (right-edge-tiles board))))))
 
  (define (choose lst)
    (list-ref lst (random (length lst))))
@@ -150,27 +71,27 @@
  ;; costs.
  (define (best-blue-candidates board)
    (map car
-        (mins+ cdr
-               (map
-                (cut hexboard-with-tile board <> 'blue
-                     (lambda (b t)
-                       (cons
-                        (hextile-correlate t board)
-                        (xest-blue-path-cost lmax b))))
-                (blue-candidates board)))))
+        (min-list/key cdr
+                      (map
+                       (cut hexboard-with-tile board <> 'blue
+                            (lambda (b t)
+                              (cons
+                               (hextile-correlate t board)
+                               (xest-blue-path-cost lmax b))))
+                       (blue-candidates board)))))
 
  ;; return a list of places red should play to maximise blue's minimum path
  ;; costs
  (define (worst-red-candidates board)
    (map car
-        (maxs+ cdr
-               (map
-                (cut hexboard-with-tile board <> 'red
-                     (lambda (b t)
-                       (cons
-                        (hextile-correlate t board)
-                        (xest-blue-path-cost lmin b))))
-                (blue-candidates board))))))
+        (max-list/key cdr
+                      (map
+                       (cut hexboard-with-tile board <> 'red
+                            (lambda (b t)
+                              (cons
+                               (hextile-correlate t board)
+                               (xest-blue-path-cost lmin b))))
+                       (blue-candidates board))))))
 
 
 ;; Interface to hexmon

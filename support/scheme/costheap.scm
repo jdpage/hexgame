@@ -41,12 +41,12 @@
   ;; for mapping back from heap positions to node numbers.
   (define-type costheap (struct costheap))
   (: make-costheap* (fixnum fixnum f64vector s32vector s32vector -> costheap))
-  (: costheap? (* -> boolean : costheap))
-  (: costheap-size (costheap -> fixnum))
-  (: costheap-capacity (costheap -> fixnum))
-  (: costheap-costs (costheap -> f64vector))
-  (: costheap-permutation (costheap -> s32vector))
-  (: costheap-inverse (costheap -> s32vector))
+  (: costheap? (* --> boolean : costheap))
+  (: costheap-size (costheap --> fixnum))
+  (: costheap-capacity (costheap --> fixnum))
+  (: costheap-costs (costheap --> f64vector))
+  (: costheap-permutation (costheap --> s32vector))
+  (: costheap-inverse (costheap --> s32vector))
   (define-record-type costheap
     (make-costheap* size capacity costs permutation inverse)
     costheap?

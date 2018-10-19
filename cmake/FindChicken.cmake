@@ -216,6 +216,7 @@ function (add_chicken_library name type)
     -Wno-sign-conversion
     -Wno-shadow
     -Wno-unused-but-set-variable
+    -Wno-unused-function
     -Wno-unused-label
     -Wno-unused-parameter
     -Wno-unused-variable
