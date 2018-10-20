@@ -15,6 +15,7 @@
 ;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 (declare (unit costheap))
+(declare (uses tictoc))
 (declare (usual-integrations))
 
 (module costheap
@@ -28,9 +29,9 @@
      costheap-min
      costheap-min!
      costheap-discount!
-     ;; costheap-bench
+     costheap-bench
      )
-  (import scheme chicken)
+  (import scheme chicken tictoc)
   (use srfi-1 srfi-4 extras)
 
   ;; A costheap provides a min-priority queue for node costs. Nodes are referred
@@ -147,8 +148,8 @@
     (let ((cs (costheap-costs ch)))
       (let next ((hp hp))
         (if (and (> hp 0)
-                 (< (f64vector-ref cs hp) (f64vector-ref cs (fx/ hp 2))))
-            (next (costheap-xchg!/heap ch hp (fx/ hp 2)))))))
+                 (< (f64vector-ref cs hp) (f64vector-ref cs (fx/ (sub1 hp) 2))))
+            (next (costheap-xchg!/heap ch hp (fx/ (sub1 hp) 2)))))))
 
   ;; Down-heap operation indexed by heap position. Starting from the given
   ;; position, exchange values downwards until current is less than both
@@ -158,8 +159,8 @@
     (let ((cs (costheap-costs ch))
           (sz (costheap-size ch)))
       (let next ((hp hp))
-        (let* ((lp (* hp 2))
-               (rp (+ lp 1))
+        (let* ((lp (add1 (* hp 2)))
+               (rp (add1 lp))
                (p hp))
 
           ;; we want to make sure we exchange with the smaller of the two, to
@@ -213,45 +214,45 @@
   ;; Performs a benchmark operation of the given size against a reference
   ;; implementation, and returns the costheap runtime divided by the reference
   ;; runtime.
-  ;; (: costheap-bench (fixnum --> float))
-  ;; (define (costheap-bench size)
-  ;;   ;; generate a set of index/weight pairs to use
-  ;;   (define data (map! (lambda (k) (cons k (exact->inexact (random size)))) (iota size)))
+  (: costheap-bench (fixnum --> float))
+  (define (costheap-bench size)
+    ;; generate a set of index/weight pairs to use
+    (define data (map! (lambda (k) (cons k (exact->inexact (random size)))) (iota size)))
 
-  ;;   ;; reference implementation
-  ;;   (define reftimer (tic))
-  ;;   (let ((scores (make-vector size +inf.0))
-  ;;         (queue '()))
+    ;; reference implementation
+    (define reftimer (tic))
+    (let ((scores (make-vector size +inf.0))
+          (queue '()))
 
-  ;;     ;; build queue
-  ;;     (for-each (lambda (p)
-  ;;                 (vector-set! scores (car p) (cdr p))
-  ;;                 (set! queue (cons (car p) queue))) data)
+      ;; build queue
+      (for-each (lambda (p)
+                  (vector-set! scores (car p) (cdr p))
+                  (set! queue (cons (car p) queue))) data)
 
-  ;;     ;; drain queue
-  ;;     (let next ((remaining queue))
-  ;;       (if (not (null? remaining))
-  ;;           (let ((k (reduce (lambda (a b)
-  ;;                              (if (< (vector-ref scores a) (vector-ref scores b)) a b))
-  ;;                            #f remaining)))
-  ;;             (next (delete! k remaining))))))
-  ;;   (define refelapsed (toc reftimer))
+      ;; drain queue
+      (let next ((remaining queue))
+        (if (not (null? remaining))
+            (let ((k (reduce (lambda (a b)
+                               (if (< (vector-ref scores a) (vector-ref scores b)) a b))
+                             #f remaining)))
+              (next (delete! k remaining))))))
+    (define refelapsed (toc reftimer))
 
-  ;;   ;; our implementation
-  ;;   (define mytimer (tic))
-  ;;   (let ((queue (make-costheap size +inf.0)))
+    ;; our implementation
+    (define mytimer (tic))
+    (let ((queue (make-costheap size +inf.0)))
 
-  ;;     ;; build queue
-  ;;     (for-each (lambda (p) (costheap-discount! queue (car p) (cdr p))) data)
+      ;; build queue
+      (for-each (lambda (p) (costheap-discount! queue (car p) (cdr p))) data)
 
-  ;;     ;; drain queue
-  ;;     (let next ()
-  ;;       (if (not (costheap-empty? queue))
-  ;;           (begin
-  ;;             (costheap-min! queue)
-  ;;             (next)))))
-  ;;   (define myelapsed (toc mytimer))
+      ;; drain queue
+      (let next ()
+        (if (not (costheap-empty? queue))
+            (begin
+              (costheap-min! queue)
+              (next)))))
+    (define myelapsed (toc mytimer))
 
-  ;;   (/ myelapsed refelapsed))
+    (/ myelapsed refelapsed))
 
   )

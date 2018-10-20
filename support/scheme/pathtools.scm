@@ -15,7 +15,7 @@
 ;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 (declare (unit pathtools))
-(declare (uses hex tictoc))
+(declare (uses hex tictoc costheap))
 
 (module pathtools
     (my-blue-board
@@ -34,8 +34,8 @@
      lmax
      xest-blue-path-cost
      )
-  (import scheme chicken hex tictoc)
-  (use srfi-1 data-structures)
+  (import scheme chicken hex tictoc costheap)
+  (use srfi-1 srfi-4 data-structures)
 
   (define-type hexboard (struct hexboard))
   (define-type hextile (struct hextile))
@@ -69,12 +69,16 @@
    (define (left-edge? tile)
      (receive (row col) (hextile-coords tile) (zero? col)))
 
-   (: blue-distance (hextile --> float))
-   (define (blue-distance t)
-     (case (hextile-color-ref t)
+   (: blue-distance/c ((or symbol false) --> float))
+   (define-inline (blue-distance/c color)
+     (case color
        ((blue) 0.0)
        ((red) +inf.0)
        (else 1.0)))
+
+   (: blue-distance (hextile --> float))
+   (define (blue-distance t)
+     (blue-distance/c (hextile-color-ref t)))
 
    (: min/key (forall (t) ((t -> float) (list-of t) -> t)))
    (define (min/key key lst)
@@ -94,44 +98,36 @@
      (min-list/key (compose - key) lst))
 
    ;; Returns a vector of path scores for the blue player
-   (: score-blue-paths (hexboard --> (vector-of float)))
+   (: score-blue-paths (hexboard --> f64vector))
    (define (score-blue-paths board)
-     (let ((scores (make-vector (hexboard-index-count board) +inf.0)))
-
-       (: score-ref (hextile -> float))
-       (define (score-ref t)
-         (vector-ref scores (hextile-index t)))
-
-       (: update-score! (hextile float -> undefined))
-       (define (update-score! t s)
-         (vector-set! scores (hextile-index t) (min s (score-ref t))))
-
-       (: min-score ((list-of hextile) -> hextile))
-       (define (min-score tiles)
-         (min/key score-ref tiles))
+     (let ((scores (make-f64vector (hexboard-index-count board) +inf.0))
+           (queue (make-costheap (hexboard-index-count board) +inf.0)))
 
        (for-each (lambda (t)
-                   (update-score! t (blue-distance t)))
+                   (costheap-discount! queue (hextile-index t) (blue-distance t)))
                  (left-edge-tiles board))
 
-       (let next ((unvisited (hexboard-tiles board)))
-         (if (not (null? unvisited))
+       (let next ()
+         (if (not (costheap-empty? queue))
              (begin
-               (let ((current (min-score unvisited)))
+               (let-values (((k v) (costheap-min! queue)))
+                 (f64vector-set! scores k v)
                  (for-each (lambda (n)
-                             (update-score! n (+ (score-ref current) (blue-distance n))))
-                           (hextile-neighbors current))
-                 (next (delete! current unvisited))))
-             scores))))
+                             (let ((color (hexboard-color-ref/i board n)))
+                               (costheap-discount! queue n (+ v (blue-distance/c color)))))
+                           (hexboard-neighbors/i board k))
+                 (next)))))
+
+       scores))
 
    ;; Returns a list of the shortest paths through the board for the blue player
-   (: shortest-blue-paths (hexboard (vector-of float) --> (list-of hextile)))
+   (: shortest-blue-paths (hexboard f64vector --> (list-of hextile)))
    (define (shortest-blue-paths board scores)
      (profiled
 
       (: score-ref (hextile --> float))
       (define (score-ref t)
-        (vector-ref scores (hextile-index t)))
+        (f64vector-ref scores (hextile-index t)))
 
       (: best-scores! ((list-of hextile) -> (list-of hextile)))
       (define (best-scores! ts)
@@ -158,14 +154,14 @@
                                              p))))
                paths))))))
 
-   (: path-cost ((vector-of float) (list-of hextile) --> float))
+   (: path-cost (f64vector (list-of hextile) --> float))
    (define (path-cost scores path)
-     (vector-ref scores (hextile-index (last path))))
+     (f64vector-ref scores (hextile-index (last path))))
 
    (: shortest-blue-path-cost (hexboard --> float))
    (define (shortest-blue-path-cost board)
      (let ((scores (score-blue-paths board)))
-       (apply min (map (lambda (t) (vector-ref scores (hextile-index t)))
+       (apply min (map (lambda (t) (f64vector-ref scores (hextile-index t)))
                        (right-edge-tiles board)))))
 
    (: lmin ((list-of float) --> float))
@@ -181,8 +177,6 @@
      (let ((scores (score-blue-paths board)))
        (sel
         (filter! (compose not (cut = +inf.0 <>))
-                 (map! (lambda (t) (vector-ref scores (hextile-index t)))
+                 (map! (lambda (t) (f64vector-ref scores (hextile-index t)))
                        (right-edge-tiles board))))))
-
-
    ))

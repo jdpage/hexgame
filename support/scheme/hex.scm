@@ -41,6 +41,8 @@
      hextile-flip
      hextile-equal?
      hextile-neighbors
+     hexboard-neighbors/i
+     hexboard-color-ref/i
      )
   (import scheme chicken foreign)
   (use lolevel data-structures srfi-1 srfi-4)
@@ -207,23 +209,7 @@
 
   (: hextile-color-ref (hextile --> (or symbol false)))
   (define (hextile-color-ref tile)
-    (let-location
-     ((color int))
-     (let ((err ((foreign-lambda*
-                  (enum hex_err_e) ((hexboard board)
-                                    (int index)
-                                    ((c-pointer int) ptr))
-                  "hex_tile *tile;"
-                  "hex_err e = hex_board_itile(board, index, &tile);"
-                  "if (e == HEX_OK) *ptr = *hex_tile_color(tile);"
-                  "C_return(e);")
-                 (hextile-board tile)
-                 (hextile-index tile)
-                 (location color))))
-       (select err
-               ((HEX_EBOUNDS) (abort '(exn bounds)))
-               ((HEX_OK) (hexcolor->object color))
-               (else (abort 'exn))))))
+    (hexboard-color-ref/i (hextile-board tile) (hextile-index tile)))
 
   (: hextile-color-set! (hextile (or symbol false) -> undefined))
   (define (hextile-color-set! tile color)
@@ -285,4 +271,38 @@
                 (map (lambda (index) (make-hextile (hextile-board tile) index))
                      (s32vector->list (subs32vector ns 0 count))))
                (else (abort 'exn))))))
+
+  (: hexboard-neighbors/i (hexboard fixnum -> (list-of fixnum)))
+  (define (hexboard-neighbors/i board index)
+    (let-location
+     ((count int))
+     (let* ((ns (make-s32vector 6))
+            (err ((foreign-lambda (enum hex_err_e) "hex_board_ineighbors"
+                                  hexboard int s32vector (c-pointer int))
+                  board index ns (location count))))
+       (select err
+               ((HEX_EBOUNDS) (abort '(exn bounds)))
+               ((HEX_OK)
+                 (s32vector->list (subs32vector ns 0 count)))
+               (else (abort 'exn))))))
+
+  (: hexboard-color-ref/i (hexboard fixnum -> (or symbol false)))
+  (define (hexboard-color-ref/i board index)
+    (let-location
+     ((color int))
+     (let ((err ((foreign-lambda*
+                  (enum hex_err_e) ((hexboard board)
+                                    (int index)
+                                    ((c-pointer int) ptr))
+                  "hex_tile *tile;"
+                  "hex_err e = hex_board_itile(board, index, &tile);"
+                  "if (e == HEX_OK) *ptr = *hex_tile_color(tile);"
+                  "C_return(e);")
+                 board index (location color))))
+       (select err
+               ((HEX_EBOUNDS) (abort '(exn bounds)))
+               ((HEX_OK) (hexcolor->object color))
+               (else (abort 'exn))))))
+
+
   )
