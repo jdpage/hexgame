@@ -11,7 +11,9 @@ set (HEX_AI_DIR "${CMAKE_INSTALL_DATADIR}/${CMAKE_PROJECT_NAME}/ai")
 
 set (CMAKE_C_STANDARD 99)
 set (CMAKE_C_EXTENSIONS ON)
-add_compile_options (
+
+if (NOT MSVC)
+  add_compile_options (
     "-Wall"
     "-Wextra"
     "-Wnull-dereference"
@@ -25,6 +27,7 @@ add_compile_options (
     "-Wpacked"
     "-Wredundant-decls"
     "$<$<CONFIG:DEBUG>:-Werror>")
+endif ()
 
 add_subdirectory (libhex)
 add_subdirectory (hexmon)

@@ -207,18 +207,27 @@ function (add_chicken_library name type)
     CHICKEN_IMPORT_LIBRARIES "${CHICKEN_IMPORT_LIBRARIES}")
 
   # Disable problematic warnings that the user might have enabled
-  target_compile_options (${name} PRIVATE
-    -Wno-conversion
-    -Wno-float-equal
-    -Wno-null-dereference
-    -Wno-redundant-decls
-    -Wno-sign-compare
-    -Wno-sign-conversion
-    -Wno-shadow
-    -Wno-unused-but-set-variable
-    -Wno-unused-function
-    -Wno-unused-label
-    -Wno-unused-parameter
-    -Wno-unused-variable
-    )
+  if (NOT MSVC)
+    target_compile_options (${name} PRIVATE
+      -Wno-conversion
+      -Wno-float-equal
+      -Wno-null-dereference
+      -Wno-redundant-decls
+      -Wno-sign-compare
+      -Wno-sign-conversion
+      -Wno-shadow
+      -Wno-unused-but-set-variable
+      -Wno-unused-function
+      -Wno-unused-label
+      -Wno-unused-parameter
+      -Wno-unused-variable
+      )
+  endif ()
+
+  # Add extra flags required for Windows.
+  if (WIN32)
+    target_compile_definitions (${name} PRIVATE
+      C_NONUNIX  # chicken.h should really detect this itself
+      )
+  endif ()
 endfunction()

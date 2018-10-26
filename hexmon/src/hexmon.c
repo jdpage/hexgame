@@ -14,146 +14,71 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-#include <hex/hexmon.h>
-#include <dlfcn.h>
-#include <errno.h>
-#include <limits.h>
-#include <string.h>
-#include <stdio.h>
+#include <hexmon_private.h>
 #include <stdlib.h>
-#include <libgen.h>
 
-
-static const char *symsuffix = "_ai_init";
-#define symsuffixlen 8
-
-
-int load_ai(hex_host_info *host, hex_ai_info *ai) {
-  void *lib;
+int load_ai(cnstring path, hex_host_info *host, hex_ai_info *ai)
+{
   hex_ai_init *init;
-  char *path, *stem, *symname;
-  size_t symlen, stemlen;
+  nstring name, symnames[2];
   int err = 0;
 
-  // Irritatingly, basename may modify its argument.
-  if ((path = strdup(host->optv[0])) == NULL) {
+  if ((name = get_ai_name(path)) == NULL) {
     err = 1;
     goto cleanup_none;
   }
-  stem = basename(path);
-  for (char *p = stem; *p != '\0'; p++) {
-    if (*p == '.') {
-      *p = '\0';
-      break;
-    }
-  }
 
-  if (strncmp(stem, "lib", 3) == 0) {
-    stem += 3;
-  }
-
-  stemlen = strlen(stem);
-  symlen = stemlen + symsuffixlen;
-  if ((symname = calloc(symlen + 1, sizeof(char))) == NULL) {
+  if ((symnames[0] = nconcat(name, NTEXT("_ai_init"))) == NULL) {
     err = 1;
-    goto cleanup_path;
+    goto cleanup_name;
   }
-  memcpy(symname, stem, stemlen);
-  memcpy(symname + stemlen, symsuffix, symsuffixlen);
-  symname[symlen] = '\0';
 
-  if ((lib = dlopen(host->optv[0], RTLD_NOW)) == NULL) {
-    fprintf(stderr, "error loading \"%s\": %s\n",
-            host->optv[0], dlerror());
+  symnames[1] = NTEXT("ai_init");
+
+  if ((init = bind_init_symbol(path, symnames, 2)) == NULL) {
     err = 1;
     goto cleanup_all;
-  }
-
-  if ((init = dlsym(lib, symname)) == NULL) {
-    fprintf(stderr, "error binding \"%s\": %s\n",
-            symname, dlerror());
-    err = 1;
-    goto error_cleanup_lib;
   }
 
   init(host, ai);
 
  cleanup_all:
-  free(symname);
+  free(symnames[0]);
 
- cleanup_path:
-  // stem doesn't need to be freed
-  free(path);
+ cleanup_name:
+  free(name);
 
  cleanup_none:
   return err;
-
- error_cleanup_lib:
-  dlclose(lib);
-  goto cleanup_all;
 }
 
-
-int run_monitor(hex_ai_info *ai)
+int run_monitor(int capacity, hex_ai_info *ai)
 {
-  char *board;
+  parser *p;
   int row, col;
+
+  parse_table_init();
+  p = make_parser(capacity);
+
   while (1) {
-    if (scanf(" move %ms", &board) > 0) {
-      ai->move_callback(ai->data, board, &row, &col);
-      free(board);
-      printf("%d %d\n", row, col);
-      fflush(stdout);
-    } else if (scanf(" quit %ms", &board) > 0) {
+    switch (parser_scan(p, stdin)) {
+    case PARSE_EOF:
+      goto cleanup;
+
+    case PARSE_CMD_MOVE:
+      ai->move_callback(ai->data, parser_data(p), &row, &col);
+      announce_move(stdout, row, col);
+      break;
+
+    case PARSE_CMD_QUIT:
       if (ai->destroy_callback != NULL) {
-        ai->destroy_callback(ai->data, board);
+        ai->destroy_callback(ai->data, parser_data(p));
       }
-      free(board);
-      return 0;
-    } else {
-      return 2;
+      goto cleanup;
     }
   }
-}
 
-
-int main(int argc, char *argv[])
-{
-  if (argc < 4) {
-    fprintf(stderr, "usage: %s size color path [opts...]\n", argv[0]);
-    return 1;
-  }
-
-  errno = 0;
-  long size = strtol(argv[1], NULL, 10);
-  if (errno != 0 || size < INT_MIN || size > INT_MAX) {
-    fprintf(stderr, "size argument must be an integer\n");
-    return 1;
-  }
-
-
-  hex_host_info host = {
-    .optv = argv + 3,
-    .optc = argc - 3,
-    .size = (int) size,
-    .color = argv[2][0],
-  };
-
-  if (host.color != 'r' && host.color != 'b') {
-    fprintf(stderr, "color argument \"%s\" should be \"red\" or \"blue\"\n",
-            argv[2]);
-  }
-
-  if (host.size < 1 || host.size > INT_MAX / host.size) {
-    fprintf(stderr, "size argument %d out of range\n", host.size);
-    return 1;
-  }
-
-  hex_ai_info ai = { 0 };
-  int err;
-  if ((err = load_ai(&host, &ai)) != 0) {
-    return err;
-  }
-
-  return run_monitor(&ai);
+ cleanup:
+  destroy_parser(p);
+  return 0;
 }
