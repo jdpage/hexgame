@@ -224,10 +224,16 @@ function (add_chicken_library name type)
       )
   endif ()
 
-  # Add extra flags required for Windows.
-  if (WIN32)
+  # Add extra flags required for Windows. Basically, lie and say we're using
+  # MinGW, then disable a bunch of warnings.
+  if (MSVC)
     target_compile_definitions (${name} PRIVATE
-      C_NONUNIX  # chicken.h should really detect this itself
+      __MINGW32__
+      __MINGW64__
+      )
+    target_compile_options (${name} PRIVATE
+      /wd4101  # unreferenced local variables
+      /wd4244  # downcast possible loss of data
       )
   endif ()
 endfunction()

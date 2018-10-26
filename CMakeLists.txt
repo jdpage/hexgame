@@ -27,6 +27,9 @@ if (NOT MSVC)
     "-Wpacked"
     "-Wredundant-decls"
     "$<$<CONFIG:DEBUG>:-Werror>")
+else ()
+  # Provides shims for building Chicken under MSVC
+  include_directories ("support/windows/include")
 endif ()
 
 add_subdirectory (libhex)
