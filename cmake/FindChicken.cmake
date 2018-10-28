@@ -207,18 +207,33 @@ function (add_chicken_library name type)
     CHICKEN_IMPORT_LIBRARIES "${CHICKEN_IMPORT_LIBRARIES}")
 
   # Disable problematic warnings that the user might have enabled
-  target_compile_options (${name} PRIVATE
-    -Wno-conversion
-    -Wno-float-equal
-    -Wno-null-dereference
-    -Wno-redundant-decls
-    -Wno-sign-compare
-    -Wno-sign-conversion
-    -Wno-shadow
-    -Wno-unused-but-set-variable
-    -Wno-unused-function
-    -Wno-unused-label
-    -Wno-unused-parameter
-    -Wno-unused-variable
-    )
+  if (NOT MSVC)
+    target_compile_options (${name} PRIVATE
+      -Wno-conversion
+      -Wno-float-equal
+      -Wno-null-dereference
+      -Wno-redundant-decls
+      -Wno-sign-compare
+      -Wno-sign-conversion
+      -Wno-shadow
+      -Wno-unused-but-set-variable
+      -Wno-unused-function
+      -Wno-unused-label
+      -Wno-unused-parameter
+      -Wno-unused-variable
+      )
+  endif ()
+
+  # Add extra flags required for Windows. Basically, lie and say we're using
+  # MinGW, then disable a bunch of warnings.
+  if (MSVC)
+    target_compile_definitions (${name} PRIVATE
+      __MINGW32__
+      __MINGW64__
+      )
+    target_compile_options (${name} PRIVATE
+      /wd4101  # unreferenced local variables
+      /wd4244  # downcast possible loss of data
+      )
+  endif ()
 endfunction()

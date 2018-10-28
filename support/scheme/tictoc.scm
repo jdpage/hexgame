@@ -28,8 +28,15 @@
   (import scheme chicken foreign)
   (use srfi-69 data-structures lolevel)
 
+  (foreign-declare "#ifndef _WIN32")
   (foreign-declare "#include <time.h>")
   (foreign-declare "#include <stdint.h>")
+  (foreign-declare "#define TIC_BUFSIZE sizeof(struct timespec)")
+  (foreign-declare "#else")
+  (foreign-declare "#define WIN32_LEAN_AND_MEAN")
+  (foreign-declare "#include <windows.h>")
+  (foreign-declare "#define TIC_BUFSIZE sizeof(LARGE_INTEGER)")
+  (foreign-declare "#endif")
 
   (define-type timer (struct timer))
   (: make-timer (blob -> timer))
@@ -41,24 +48,43 @@
     (buffer timer-buffer))
   (define-foreign-type timer scheme-pointer timer-buffer)
 
-  (: sizeof-timespec fixnum)
-  (define sizeof-timespec (foreign-value "sizeof(struct timespec)" size_t))
+  (: perf-frequency fixnum)
+  (define perf-frequency
+    ((foreign-lambda* integer64 ()
+                      "#ifdef _WIN32\n"
+                      "LARGE_INTEGER freq;\n"
+                      "QueryPerformanceFrequency(&freq);\n"
+                      "C_return(freq.QuadPart);\n"
+                      "#else\n"
+                      "C_return(0);\n"
+                      "#endif\n")))
 
   (: tic (-> timer))
   (define (tic)
-    (let ((t (make-timer (make-blob sizeof-timespec))))
+    (let ((t (make-timer (make-blob (foreign-value "TIC_BUFSIZE" size_t)))))
       ((foreign-lambda* void ((timer t))
-                        "clock_gettime(CLOCK_PROCESS_CPUTIME_ID, t);")
+                        "#ifdef _WIN32\n"
+                        "QueryPerformanceCounter(t);\n"
+                        "#else\n"
+                        "clock_gettime(CLOCK_PROCESS_CPUTIME_ID, t);\n"
+                        "#endif\n")
        t)
       t))
 
   (: toc (timer -> fixnum))
   (define (toc t)
-    ((foreign-lambda* integer64 ((timer t))
-                      "struct timespec e, *s = t;"
-                      "clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &e);"
-                      "C_return((e.tv_sec - s->tv_sec) * (int64_t)1e9 + (e.tv_nsec - s->tv_nsec));")
-     t))
+    ((foreign-lambda* integer64 ((timer t) (integer64 freq))
+                      "#ifdef _WIN32\n"
+                      "LARGE_INTEGER e, *s = t;\n"
+                      "QueryPerformanceCounter(&e);\n"
+                      "C_return((e.QuadPart - s->QuadPart) * 1e9 / freq);\n"
+                      "#else\n"
+                      "struct timespec e, *s = t;\n"
+                      "clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &e);\n"
+                      "C_return((e.tv_sec - s->tv_sec) * (int64_t)1e9\n"
+                      "         + (e.tv_nsec - s->tv_nsec));\n"
+                      "#endif\n")
+     t perf-frequency))
 
   (define profile-info '())
   (define profile-counts (make-hash-table #:initial 0))

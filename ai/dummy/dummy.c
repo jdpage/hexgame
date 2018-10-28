@@ -24,6 +24,11 @@
 #  define UNUSED(x) UNUSED_ ## x
 #endif
 
+#if defined(_WIN32) && defined(dummy_EXPORTS)
+#   define DUMMY_EXPORT extern __declspec(dllexport)
+#else
+#   define DUMMY_EXPORT
+#endif
 
 typedef struct {
   hex_host_info *host;
@@ -110,9 +115,16 @@ void dummy_destroy(void *data, char * UNUSED(board))
 }
 
 
-void dummy_ai_init(hex_host_info *host, hex_ai_info *ai)
+DUMMY_EXPORT void dummy_ai_init(hex_host_info *host, hex_ai_info *ai)
 {
-  dummy_state *state = malloc(sizeof(dummy_state));
+  dummy_state *state;
+
+  // For debugging purposes, print the provided options to stderr.
+  for (int k = 0; k < host->optc; k++) {
+    fprintf(stderr, "optv[%d]: %s\n", k, host->optv[k]);
+  }
+
+  state = malloc(sizeof(dummy_state));
   state->host = host;
 
   ai->data = state;
