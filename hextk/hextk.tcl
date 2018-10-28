@@ -115,6 +115,8 @@ proc build_gameview {win} {
     $win configure -menu $mbar
 
     set mgame [menu $mbar.game -tearoff 0]
+    $mgame add command -label "New..." -underline 0 -command { configure_game }
+    $mgame add command -label "Restart" -underline 0 -command { restart_game }
     $mgame add command -label "Quit" -underline 0 -command { quit_game }
 
     set mview [menu $mbar.view -tearoff 0]
@@ -127,7 +129,7 @@ proc build_gameview {win} {
 
 
 proc quit_game {} {
-    # TODO terminate children (required on Windows)
+    end_game
     exit
 }
 
@@ -208,6 +210,7 @@ proc draw_board {cn s board} {
     set width [expr {($d*3 + 3) * $s}]
     set height [expr {$s * ($d * 2 + 0.5) * $stcos(30) + $s * 2}]
 
+    $cn delete all
     $cn configure -width $width -height $height
 
     # red player edges
@@ -387,8 +390,7 @@ proc receive_move {m} {
     set winner [$game(board) winner]
     if {$winner ne ""} {
         .game.view configure -bg $color($winner)
-        set game(current) done
-        stop_ais
+        end_game
         return
     }
 
@@ -399,6 +401,27 @@ proc receive_move {m} {
     }
 
     request_move $game(current)
+}
+
+
+proc end_game {} {
+    global game
+    set game(current) done
+    stop_ais
+}
+
+
+proc configure_game {} {
+    end_game
+
+    wm withdraw .game
+    wm deiconify .config
+}
+
+
+proc restart_game {} {
+    end_game
+    play_game
 }
 
 
