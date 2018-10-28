@@ -66,7 +66,7 @@ proc find_ais {share} {
 
 proc build_config {win} {
     wm title $win "Hex Setup"
-    bind $win <Destroy> { exit }
+    bind $win <Destroy> { quit_game }
 
     set c [ttk::frame $win.f]
     pack $c -fill both -expand 1
@@ -106,10 +106,47 @@ proc build_gameview {win} {
     wm title $win "Hex Game"
 
     # TODO: prompt for exit and shut down children
-    bind $win <Destroy> { exit }
+    bind $win <Destroy> { quit_game }
 
     canvas $win.view
     pack $win.view -side top
+
+    set mbar [menu $win.mbar]
+    $win configure -menu $mbar
+
+    set mgame [menu $mbar.game -tearoff 0]
+    $mgame add command -label "Quit" -underline 0 -command { quit_game }
+
+    set mview [menu $mbar.view -tearoff 0]
+    $mview add command -label "AI Red Console" -underline 3 -command { wm deiconify .conred }
+    $mview add command -label "AI Blue Console" -underline 3 -command { wm deiconify .conblue }
+
+    $mbar add cascade -label "Game" -underline 0 -menu $mgame
+    $mbar add cascade -label "View" -underline 0 -menu $mview
+}
+
+
+proc quit_game {} {
+    # TODO terminate children (required on Windows)
+    exit
+}
+
+
+proc build_aiconsole {win color} {
+    wm title $win "AI $color Console"
+
+    ttk::scrollbar $win.scroll -orient vertical -command [list $win.log yview]
+    pack $win.scroll -side right -fill y
+
+    text $win.log -state disabled -yscrollcommand [list $win.scroll set]
+    pack $win.log -side right -fill both -expand 1
+
+    $win.log tag configure err -foreground red
+
+    wm transient $win .
+    wm group $win .
+    wm withdraw $win
+    wm protocol $win WM_DELETE_WINDOW [list wm withdraw $win]
 }
 
 
@@ -208,9 +245,16 @@ proc start_ai {ai color} {
     if {$path eq ""} {
         set game(ai$color) ""
     } else {
-        set game(ai$color) [open |[list hexmon [$game(board) size] $color $path 2>@stderr] r+]
+        foreach {rerr werr} [chan pipe] {}
+        set game(ai$color) [open |[list hexmon [$game(board) size] $color $path 2>@$werr] r+]
+        close $werr
+        set game(ai$color,err) $rerr
+
         fconfigure $game(ai$color) -buffering line -blocking 0
         fileevent $game(ai$color) readable [list ai_ready $color]
+
+        fconfigure $game(ai$color,err) -buffering line -blocking 0
+        fileevent $game(ai$color,err) readable [list ai_err $color]
     }
 }
 
@@ -252,11 +296,44 @@ proc ai_ready {color} {
 }
 
 
-proc human_ready {m} {
+proc ai_err {color} {
     global game
 
+    if {[eof $game(ai$color,err)]} {
+        close $game(ai$color,err)
+        return
+    }
+
+    set line [gets $game(ai$color,err)]
+    if {$line ne ""} {
+        post_message $color err [string trim $line]
+    }
+}
+
+
+proc post_message {color tags msg} {
+    set w .con$color
+    set t $w.log
+
+    $t configure -state normal
+    $t insert end "$msg\n" $tags
+    $t configure -state disabled
+
+    if {[wm state $w] eq "withdrawn"} {
+        wm deiconify $w
+    }
+}
+
+
+proc hex_click_allowed {} {
+    global game
+    return [expr {$game(current) ne "done" && $game(ai$game(current)) eq ""}]
+}
+
+
+proc human_ready {m} {
     # make sure we're supposed to be looking at moves from humans
-    if {$game(current) ne "done" && $game(ai$game(current)) eq ""} {
+    if {[hex_click_allowed]} {
         receive_move $m
     }
 }
@@ -345,6 +422,8 @@ proc main {} {
 
     build_config [toplevel .config -class "Hex Game"]
     build_gameview [toplevel .game -class "Hex Game"]
+    build_aiconsole [toplevel .conred -class "Hex Game"] red
+    build_aiconsole [toplevel .conblue -class "Hex Game"] blue
     wm withdraw .
     wm withdraw .game
 }
