@@ -14,6 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+#ifdef __GNUC__
+#  define UNUSED(x) UNUSED_ ## x __attribute__((__unused__))
+#else
+#  define UNUSED(x) UNUSED_ ## x
+#endif
+
 #ifdef _WIN32
 
 #define UNICODE
@@ -119,7 +125,7 @@ parse_event parser_scan(parser *p, FILE *input);
 void announce_move(FILE *channel, int row, int col);
 
 // Tries to bind an init symbol from the dynamic library at the given path.
-hex_ai_init *bind_init_symbol(cnstring path, cnstring *symname, int symcount);
+hex_ai_init *bind_init_symbol(cnstring path, nstring *symname, int symcount);
 
 // Derives the AI name from the dynamic library path.
 nstring get_ai_name(cnstring path);

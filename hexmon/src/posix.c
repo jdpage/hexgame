@@ -92,7 +92,7 @@ char *get_ai_name(const char *cpath) {
   return rstem;
 }
 
-hex_ai_init *bind_init_symbol(const char *path, const char **syms, int count)
+hex_ai_init *bind_init_symbol(const char *path, char **syms, int count)
 {
   void *lib;
   hex_ai_init *init = NULL;

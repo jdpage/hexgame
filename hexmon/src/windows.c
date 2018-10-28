@@ -15,6 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <hexmon_private.h>
+#include <shellapi.h>
 #include <stdlib.h>
 #include <malloc.h>
 #include <wchar.h>
@@ -32,6 +33,7 @@ parse_event parser_scan(parser *p, FILE *input)
     e = parser_receive(p, fgetwc(input));
     if (e == PARSE_ERROR) {
       fwprintf(stderr, L"invalid command\n");
+      fflush(stderr);
     }
   } while (e == PARSE_ERROR || e == PARSE_CONTINUE);
 
@@ -98,37 +100,54 @@ wchar_t *get_ai_name(const wchar_t *cpath)
 char *mbconvert(const wchar_t *s)
 {
   int len = WideCharToMultiByte(CP_UTF8, 0, s, -1, NULL, 0, NULL, NULL);
-  char *mbstr = calloc(len, sizeof(char));
+  char *mbstr = calloc((size_t) len, sizeof(char));
   WideCharToMultiByte(CP_UTF8, 0, s, -1, mbstr, len, NULL, NULL);
   return mbstr;
 }
 
+wchar_t *formatmessage(DWORD error)
+{
+  wchar_t *msg;
+  FormatMessage(
+    FORMAT_MESSAGE_ALLOCATE_BUFFER
+    | FORMAT_MESSAGE_FROM_SYSTEM
+    | FORMAT_MESSAGE_IGNORE_INSERTS,
+    NULL, error, 0, (wchar_t *) &msg, 0, NULL);
+  return msg;
+}
+
 hex_ai_init *bind_init_symbol(
   const wchar_t *path,
-  const wchar_t **syms,
+  wchar_t **syms,
   int count)
 {
+  DWORD err;
   HINSTANCE lib;
   hex_ai_init *init = NULL;
 
   if ((lib = LoadLibrary(path)) == NULL) {
-    fwprintf(stderr, L"error loading \"%s\"\n", path);
+    wchar_t *msg = formatmessage(GetLastError());
+    fwprintf(stderr, L"error loading \"%s\": %s\n", path, msg);
+    LocalFree(msg);
     return NULL;
   }
 
   for (int k = 0; k < count; k++) {
     char *mbsym = mbconvert(syms[k]);
-    init = (hex_ai_init *) GetProcAddress(lib, mbsym);
+    init = (hex_ai_init *) (void (*)(void)) GetProcAddress(lib, mbsym);
+    err = GetLastError();
     free(mbsym);
     if (init != NULL) {
       break;
     }
 
-    fwprintf(stderr, L"couldn't bind \"%s\"\n", syms[k]);
+    wchar_t *msg = formatmessage(err);
+    fwprintf(stderr, L"couldn't bind \"%s\": %s\n", syms[k], msg);
+    LocalFree(msg);
   }
 
   if (init == NULL) {
-    fwprintf(stderr, L"error binding all given symbols\n");
+    fwprintf(stderr, L"errors binding all given symbols\n");
     FreeLibrary(lib);
   }
 
@@ -167,7 +186,7 @@ int wmain(int argc, wchar_t *argv[])
 
   // AIs expect UTF8 optv, so go ahead and do the conversion.
   host.optc = argc - 3;
-  host.optv = calloc(host.optc, sizeof(char *));
+  host.optv = calloc((size_t) host.optc, sizeof(char *));
   for (int k = 0; k < host.optc; k++) {
     host.optv[k] = mbconvert(argv[k + 3]);
   }
@@ -189,4 +208,18 @@ int wmain(int argc, wchar_t *argv[])
   free(host.optv);
 
   return err;
+}
+
+int WinMain(
+  HINSTANCE UNUSED(hInstance),
+  HINSTANCE UNUSED(hPrevInstance),
+  PSTR UNUSED(lpCmdLine),
+  INT UNUSED(nCmdShow))
+{
+  // we want the wide-char command line, but we have to use WinMain not wWinMain
+  // for MinGW to be happy.
+  wchar_t *cmdline = GetCommandLineW();
+  int argc;
+  wchar_t **argv = CommandLineToArgvW(cmdline, &argc);
+  return wmain(argc, argv);
 }

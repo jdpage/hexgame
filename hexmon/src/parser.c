@@ -128,8 +128,9 @@ void parse_table_init(void)
 
 parser *make_parser(int capacity)
 {
-  parser *p = calloc(1, sizeof(parser) + sizeof(char) * (capacity + 1));
-  p->capacity = capacity;
+  size_t datasize = sizeof(char) * ((size_t) (capacity + 1));
+  parser *p = calloc(1, sizeof(parser) + datasize);
+  p->capacity = (size_t) capacity;
   p->state = S_LINE_START;
   return p;
 }
@@ -184,7 +185,7 @@ parse_event parser_receive(parser *p, int c)
     }
 
     // copy the character into the buffer
-    p->data[p->pos++] = c;
+    p->data[p->pos++] = (char) c;
 
     // reaching the end of the buffer triggers the transition to an OK state.
     // Further non-space characters will cause an error.

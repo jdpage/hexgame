@@ -3,6 +3,7 @@ add_chicken_library (scheme_hex STATIC
   EMIT_IMPORT_LIBRARIES hex
   EMBEDDED)
 target_link_libraries (scheme_hex PUBLIC hex)
+target_link_libraries (scheme_hex INTERFACE hex)
 
 add_chicken_library (scheme_tictoc STATIC
   tictoc.scm

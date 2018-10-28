@@ -75,6 +75,9 @@ int run_monitor(int capacity, hex_ai_info *ai)
         ai->destroy_callback(ai->data, parser_data(p));
       }
       goto cleanup;
+
+    default:
+      break;
     }
   }
 

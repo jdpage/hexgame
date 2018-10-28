@@ -51,7 +51,7 @@ proc find_ais {share} {
 
     set aipath [file join $share ai]
     set ais [dict create human {}]
-    foreach ai [glob -directory $aipath *.so] {
+    foreach ai [glob -directory $aipath "*[info sharedlibextension]"] {
         set name [file rootname [file tail $ai]]
         if {[string compare -length 3 lib $name] == 0} {
             set name [string range $name 3 end]
@@ -326,15 +326,22 @@ proc play_game {} {
 
 
 proc main {} {
-    # TODO calculate this properly
-    tk scaling 1.0
-    ttk::style theme use clam
-
     set share [file dirname [info script]]
     set ::game(ais) [find_ais $share]
-    set ldpath [split [array get ::env LD_LIBRARY_PATH] :]
-    lappend ldpath $share
-    set ::env(LD_LIBRARY_PATH) [join $ldpath :]
+
+    if {[lindex $::tcl_platform(os) 0] eq "Windows"} {
+        ttk::style theme use xpnative
+    } else {
+        # TODO calculate this properly
+        # seems to behave super weird under Linux
+        tk scaling 1.0
+        ttk::style theme use clam
+
+        set sep $::tcl_platform(pathSeparator)
+        set ldpath [split [array get ::env LD_LIBRARY_PATH] $sep]
+        lappend ldpath $share
+        set ::env(LD_LIBRARY_PATH) [join $ldpath $sep]
+    }
 
     build_config [toplevel .config -class "Hex Game"]
     build_gameview [toplevel .game -class "Hex Game"]

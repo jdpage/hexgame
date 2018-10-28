@@ -517,7 +517,7 @@ static int get_oo_class(Tcl_Interp *interp, Tcl_Class *ooclass_cls)
 }
 
 
-int Hex_Init(Tcl_Interp *interp)
+HEX_EXPORT int Hex_Init(Tcl_Interp *interp)
 {
   int err;
 
