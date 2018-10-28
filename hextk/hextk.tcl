@@ -25,6 +25,8 @@ set gameconfig(first) blue
 set gameconfig(size) 11
 
 array set game {}
+set game(aired) ""
+set game(aiblue) ""
 
 array set stcos {}
 array set stsin {}
@@ -37,6 +39,7 @@ for {set a 0} {$a <= 360} {incr a 30} {
 
 array set color {}
 set color(empty) white
+set color(background) {light grey}
 set color(red) red
 set color(blue) blue
 set color(hover_red) pink
@@ -211,7 +214,7 @@ proc draw_board {cn s board} {
     set height [expr {$s * ($d * 2 + 0.5) * $stcos(30) + $s * 2}]
 
     $cn delete all
-    $cn configure -width $width -height $height
+    $cn configure -width $width -height $height -bg $color(background)
 
     # red player edges
     $cn create polygon [list \
@@ -289,6 +292,8 @@ proc stop_ai {color} {
     }
 
     puts $game(ai$color) "quit [$game(board) dump]"
+    tkwait variable game(ai$color)
+    post_message $color {} "terminated"
 }
 
 
@@ -305,6 +310,7 @@ proc ai_ready {color} {
     if {[eof $game(ai$color)]} {
         if {$game(current) eq "done"} {
             close $game(ai$color)
+            set game(ai$color) ""
             return
         }
 
