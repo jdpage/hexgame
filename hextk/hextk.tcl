@@ -160,10 +160,29 @@ proc draw_hex {c x y r tag} {
     }
 
     $c create polygon $points -fill $color(empty) -tag $tag -width 0
-    $c bind $tag <Enter> [list apply {{c tag} {
-        $c itemconfig $tag -fill $::color(hover_$::game(current))
-    }} $c $tag]
-    $c bind $tag <Leave> [list $c itemconfig $tag -fill $color(empty)]
+    $c bind $tag <Enter> [list hex_enter $c $tag]
+    $c bind $tag <Leave> [list hex_leave $c $tag]
+}
+
+
+proc hex_enter {c tag} {
+    global color
+    global game
+
+    $c itemconfig $tag -fill $color(hover_$game(current))
+    if {[hex_click_allowed]} {
+        $c configure -cursor hand2
+    } elseif {$game(current) ne "done"} {
+        $c configure -cursor watch
+    }
+}
+
+
+proc hex_leave {c tag} {
+    global color
+
+    $c itemconfig $tag -fill $color(empty)
+    $c configure -cursor {}
 }
 
 
