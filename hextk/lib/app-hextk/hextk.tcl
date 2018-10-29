@@ -439,11 +439,6 @@ proc main {} {
         # seems to behave super weird under Linux
         tk scaling 1.0
         ttk::style theme use clam
-
-        set sep $::tcl_platform(pathSeparator)
-        set ldpath [split [array get ::env LD_LIBRARY_PATH] $sep]
-        lappend ldpath [file join $::starkit::topdir "lib/hex"]
-        set ::env(LD_LIBRARY_PATH) [join $ldpath $sep]
     }
 
     wm withdraw .

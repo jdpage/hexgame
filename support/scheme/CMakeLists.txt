@@ -2,8 +2,8 @@ add_chicken_library (scheme_hex STATIC
   hex.scm
   EMIT_IMPORT_LIBRARIES hex
   EMBEDDED)
-target_link_libraries (scheme_hex PUBLIC hex)
-target_link_libraries (scheme_hex INTERFACE hex)
+target_link_libraries (scheme_hex PUBLIC hex_static)
+target_link_libraries (scheme_hex INTERFACE hex_static)
 
 add_chicken_library (scheme_tictoc STATIC
   tictoc.scm
