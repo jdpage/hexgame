@@ -25,8 +25,10 @@ set gameconfig(first) blue
 set gameconfig(size) 11
 
 array set game {}
+set game(board) ""
 set game(aired) ""
 set game(aiblue) ""
+set game(selected) ""
 
 array set stcos {}
 array set stsin {}
@@ -165,29 +167,53 @@ proc draw_hex {c x y r tag} {
     }
 
     $c create polygon $points -fill $color(empty) -tag $tag -width 0
-    $c bind $tag <Enter> [list hex_enter $c $tag]
-    $c bind $tag <Leave> [list hex_leave $c $tag]
 }
 
 
-proc hex_enter {c tag} {
-    global color
+proc hex_enter {m} {
     global game
 
-    $c itemconfig $tag -fill $color(hover_$game(current))
-    if {[hex_click_allowed]} {
-        $c configure -cursor hand2
-    } elseif {$game(current) ne "done"} {
-        $c configure -cursor watch
-    }
+    set game(selected) $m
+    hex_refresh $m
 }
 
 
-proc hex_leave {c tag} {
+proc hex_leave {m} {
+    global game
+
+    set game(selected) ""
+    hex_refresh $m
+}
+
+
+proc hex_refresh {m} {
+    global game
     global color
 
-    $c itemconfig $tag -fill $color(empty)
-    $c configure -cursor {}
+    set cn .game.view
+    if {$m eq "" || ($game(board) ne "" && [$game(board) get $m] ne "")} {
+        $cn configure -cursor {}
+        return
+    }
+
+    foreach {r c} $m {}
+    set tag "$r,$c"
+
+    if {$game(selected) eq $m} {
+        # draw with the current player's hover color
+        $cn itemconfig $tag -fill $color(hover_$game(current))
+        if {[hex_click_allowed]} {
+            $cn configure -cursor hand2
+        } elseif {$game(current) ne "done"} {
+            $cn configure -cursor watch
+        } else {
+            $cn configure -cursor {}
+        }
+    } else {
+        # reset to empty
+        $cn itemconfig $tag -fill $color(empty)
+        $cn configure -cursor {}
+    }
 }
 
 
@@ -245,8 +271,11 @@ proc draw_board {cn s board} {
         -fill $color(blue) -width 0
 
     foreach {r c} [$board coords] {
-        draw_hex $cn [hex_x $r $c $s] [hex_y $r $c $s] $s "$r,$c"
-        $cn bind "$r,$c" <1> [list human_ready [list $r $c]]
+        set tag "$r,$c"
+        draw_hex $cn [hex_x $r $c $s] [hex_y $r $c $s] $s $tag
+        $cn bind $tag <Enter> [list hex_enter [list $r $c]]
+        $cn bind $tag <Leave> [list hex_leave [list $r $c]]
+        $cn bind $tag <1> [list human_ready [list $r $c]]
     }
 }
 
@@ -395,8 +424,9 @@ proc receive_move {m} {
     # check for a win
     set winner [$game(board) winner]
     if {$winner ne ""} {
-        .game.view configure -bg $color($winner)
         end_game
+        .game.view configure -bg $color($winner)
+        hex_refresh $game(selected)
         return
     }
 
@@ -406,6 +436,7 @@ proc receive_move {m} {
         set game(current) red
     }
 
+    hex_refresh $game(selected)
     request_move $game(current)
 }
 
@@ -427,16 +458,25 @@ proc configure_game {} {
 
 proc restart_game {} {
     end_game
-    play_game
+    start_game
 }
 
 
 proc play_game {} {
+    wm withdraw .config
+    wm deiconify .game
+
+    start_game
+}
+
+
+proc start_game {} {
     global gameconfig
     global game
 
-    wm withdraw .config
-    wm deiconify .game
+    if {$game(board) ne ""} {
+        $game(board) destroy
+    }
 
     set game(current) $gameconfig(first)
     set game(board) [hex::board new $gameconfig(size)]
