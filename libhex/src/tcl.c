@@ -121,9 +121,14 @@ int hex_board_ctor_method(
       Tcl_WrongNumArgs(interp, 1, objv, "new size");
       return TCL_ERROR;
     }
-  } else {
+  } else if (strcmp("create", Tcl_GetString(objv[1])) == 0) {
     if (objc != 4) {
       Tcl_WrongNumArgs(interp, 1, objv, "create name size");
+      return TCL_ERROR;
+    }
+  } else {
+    if (objc != 2) {
+      Tcl_WrongNumArgs(interp, 1, objv, "size");
       return TCL_ERROR;
     }
   }

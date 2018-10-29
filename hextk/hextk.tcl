@@ -15,20 +15,10 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 package require Tk 8.6
-package require hex
+source [file join [file dirname [info script]] "game.tcl"]
 
-
-array set gameconfig {}
-set gameconfig(blue) human
-set gameconfig(red) human
-set gameconfig(first) blue
-set gameconfig(size) 11
-
-array set game {}
-set game(board) ""
-set game(aired) ""
-set game(aiblue) ""
-set game(selected) ""
+array set ais {}
+set ais(human) {}
 
 array set stcos {}
 array set stsin {}
@@ -39,460 +29,405 @@ for {set a 0} {$a <= 360} {incr a 30} {
     set stsin($a) [expr {sin($ang)}]
 }
 
-array set color {}
-set color(empty) white
-set color(background) {light grey}
-set color(red) red
-set color(blue) blue
-set color(hover_red) pink
-set color(hover_blue) {light blue}
-set color(hover_done) {light grey}
+set tilesize 40
 
+array set colors {}
+set colors(empty) white
+set colors(background) {light grey}
+set colors(red) red
+set colors(blue) blue
+set colors(hover_red) pink
+set colors(hover_blue) {light blue}
+set colors(hover_done) {light grey}
+
+proc lhas {lst item} {
+    return [expr {[lsearch -exact $lst $item] != -1}]
+}
 
 proc find_ais {share} {
     # AIs are stored in the ai directory. Right now we only support shared
     # object AIs; in the future, maybe we'll provide loaders for other
     # languages?
 
+    global ais
+
     set aipath [file join $share ai]
-    set ais [dict create human {}]
     foreach ai [glob -directory $aipath "*[info sharedlibextension]"] {
         set name [file rootname [file tail $ai]]
         if {[string compare -length 3 lib $name] == 0} {
             set name [string range $name 3 end]
         }
 
-        dict set ais $name [file normalize $ai]
+        set ais($name) [file normalize $ai]
+    }
+}
+
+oo::class create Toplevel {
+    mixin CommandInvoking
+    variable Hull
+
+    constructor {path args} {
+        set tlargs [my ConfigureCommands 0 {*}$args]
+        set Hull [toplevel $path {*}$tlargs]
     }
 
-    return $ais
-}
-
-
-proc build_config {win} {
-    wm title $win "Hex Setup"
-    bind $win <Destroy> { quit_game }
-
-    set c [ttk::frame $win.f]
-    pack $c -fill both -expand 1
-
-    foreach {name text} {blue "Blue:" red "Red:"} {
-        ttk::labelframe $c.$name -text $text
-        pack $c.$name -side top -fill both -expand 1 -padx 10 -pady 10
-
-        ttk::combobox $c.$name.sel \
-            -state readonly \
-            -values [dict keys $::game(ais)] \
-            -textvariable gameconfig($name)
-        pack $c.$name.sel -side top -fill x -expand 1 -padx 10 -pady 10
-
-        ttk::radiobutton $c.$name.first \
-            -text "First turn" \
-            -value $name \
-            -variable gameconfig(first)
-        pack $c.$name.first -side top -fill x -expand 1 -padx 10 -pady 10
+    destructor {
+        destroy $Hull
     }
 
-    # TODO this is kind of ugly next to the TTK widgets, but ttk::scale doesn't
-    # support the -resolution option.
-    tk::scale $c.size \
-        -from 7 -to 19 \
-        -orient horizontal \
-        -variable gameconfig(size) \
-        -resolution 1
-    pack $c.size -side top -fill x -padx 10 -pady 10
-
-    ttk::button $c.play -text Play -command { play_game }
-    pack $c.play -side bottom -fill x -padx 10 -pady 10
-}
-
-
-proc build_gameview {win} {
-    wm title $win "Hex Game"
-
-    # TODO: prompt for exit and shut down children
-    bind $win <Destroy> { quit_game }
-
-    canvas $win.view
-    pack $win.view -side top
-
-    set mbar [menu $win.mbar]
-    $win configure -menu $mbar
-
-    set mgame [menu $mbar.game -tearoff 0]
-    $mgame add command -label "New..." -underline 0 -command { configure_game }
-    $mgame add command -label "Restart" -underline 0 -command { restart_game }
-    $mgame add command -label "Quit" -underline 0 -command { quit_game }
-
-    set mview [menu $mbar.view -tearoff 0]
-    $mview add command -label "AI Red Console" -underline 3 -command { wm deiconify .conred }
-    $mview add command -label "AI Blue Console" -underline 3 -command { wm deiconify .conblue }
-
-    $mbar add cascade -label "Game" -underline 0 -menu $mgame
-    $mbar add cascade -label "View" -underline 0 -menu $mview
-}
-
-
-proc quit_game {} {
-    end_game
-    exit
-}
-
-
-proc build_aiconsole {win color} {
-    wm title $win "AI $color Console"
-
-    ttk::scrollbar $win.scroll -orient vertical -command [list $win.log yview]
-    pack $win.scroll -side right -fill y
-
-    text $win.log -state disabled -yscrollcommand [list $win.scroll set]
-    pack $win.log -side right -fill both -expand 1
-
-    $win.log tag configure err -foreground red
-
-    wm transient $win .
-    wm group $win .
-    wm withdraw $win
-    wm protocol $win WM_DELETE_WINDOW [list wm withdraw $win]
-}
-
-
-proc draw_hex {c x y r tag} {
-    global stcos
-    global stsin
-    global color
-
-    for {set a 30} {$a < 360} {incr a 60} {
-        lappend points [expr {$x+$r*$stcos($a)}] [expr {$y+$r*$stsin($a)}]
+    method configure {args} {
+        $Hull configure {*}[my ConfigureCommands 0 {*}$args]
     }
 
-    $c create polygon $points -fill $color(empty) -tag $tag -width 0
-}
-
-
-proc hex_enter {m} {
-    global game
-
-    set game(selected) $m
-    hex_refresh $m
-}
-
-
-proc hex_leave {m} {
-    global game
-
-    set game(selected) ""
-    hex_refresh $m
-}
-
-
-proc hex_refresh {m} {
-    global game
-    global color
-
-    set cn .game.view
-    if {$m eq "" || ($game(board) ne "" && [$game(board) get $m] ne "")} {
-        $cn configure -cursor {}
-        return
-    }
-
-    foreach {r c} $m {}
-    set tag "$r,$c"
-
-    if {$game(selected) eq $m} {
-        # draw with the current player's hover color
-        $cn itemconfig $tag -fill $color(hover_$game(current))
-        if {[hex_click_allowed]} {
-            $cn configure -cursor hand2
-        } elseif {$game(current) ne "done"} {
-            $cn configure -cursor watch
-        } else {
-            $cn configure -cursor {}
+    method show {} {
+        if {[wm state $Hull] eq "withdrawn"} {
+            wm deiconify $Hull
         }
-    } else {
-        # reset to empty
-        $cn itemconfig $tag -fill $color(empty)
-        $cn configure -cursor {}
-    }
-}
-
-
-proc hex_x {r c s} {
-    return [expr {$s * ($c*2 + $r + 3)}]
-}
-
-
-proc hex_y {r c s} {
-    global stcos
-
-    return [expr {$s * 2 * ($r*$stcos(30) + 1)}]
-}
-
-
-proc draw_board {cn s board} {
-    global stcos
-    global color
-
-    set w [expr {$s * 2}]
-    set d [$board size]
-    set d1 [expr {$d - 1}]
-    set width [expr {($d*3 + 3) * $s}]
-    set height [expr {$s * ($d * 2 + 0.5) * $stcos(30) + $s * 2}]
-
-    $cn delete all
-    $cn configure -width $width -height $height -bg $color(background)
-
-    # red player edges
-    $cn create polygon [list \
-                            [hex_x -1 -1 $s] [hex_y -1 -1 $s] \
-                            [hex_x 0 0 $s] [hex_y 0 0 $s] \
-                            [hex_x 0 $d1 $s] [hex_y 0 $d1 $s] \
-                            [hex_x -1 $d $s] [hex_y -1 $d $s]] \
-        -fill $color(red) -width 0
-    $cn create polygon [list \
-                            [hex_x $d $d $s] [hex_y $d $d $s] \
-                            [hex_x $d1 $d1 $s] [hex_y $d1 $d1 $s] \
-                            [hex_x $d1 0 $s] [hex_y $d1 0 $s] \
-                            [hex_x $d -1 $s] [hex_y $d -1 $s]] \
-        -fill $color(red) -width 0
-
-    # blue player edges
-    $cn create polygon [list \
-                            [hex_x $d1 0 $s] [hex_y $d1 0 $s] \
-                            [hex_x 0 0 $s] [hex_y 0 0 $s] \
-                            [hex_x -1 -1 $s] [hex_y -1 -1 $s] \
-                            [hex_x $d -1 $s] [hex_y $d -1 $s]] \
-        -fill $color(blue) -width 0
-    $cn create polygon [list \
-                            [hex_x $d $d $s] [hex_y $d $d $s] \
-                            [hex_x -1 $d $s] [hex_y -1 $d $s] \
-                            [hex_x 0 $d1 $s] [hex_y 0 $d1 $s] \
-                            [hex_x $d1 $d1 $s] [hex_y $d1 $d1 $s]] \
-        -fill $color(blue) -width 0
-
-    foreach {r c} [$board coords] {
-        set tag "$r,$c"
-        draw_hex $cn [hex_x $r $c $s] [hex_y $r $c $s] $s $tag
-        $cn bind $tag <Enter> [list hex_enter [list $r $c]]
-        $cn bind $tag <Leave> [list hex_leave [list $r $c]]
-        $cn bind $tag <1> [list human_ready [list $r $c]]
-    }
-}
-
-
-proc mark_space {r c col} {
-    global color
-
-    set cn .game.view
-    set t "$r,$c"
-    $cn itemconfigure "$r,$c" -fill $color($col)
-    $cn bind $t <Enter> {}
-    $cn bind $t <Leave> {}
-    $cn bind $t <1> {}
-}
-
-
-proc start_ai {ai color} {
-    global game
-
-    set path [dict get $game(ais) $ai]
-    if {$path eq ""} {
-        set game(ai$color) ""
-    } else {
-        foreach {rerr werr} [chan pipe] {}
-        set game(ai$color) [open |[list hexmon [$game(board) size] $color $path 2>@$werr] r+]
-        close $werr
-        set game(ai$color,err) $rerr
-
-        fconfigure $game(ai$color) -buffering line -blocking 0
-        fileevent $game(ai$color) readable [list ai_ready $color]
-
-        fconfigure $game(ai$color,err) -buffering line -blocking 0
-        fileevent $game(ai$color,err) readable [list ai_err $color]
-    }
-}
-
-
-proc stop_ai {color} {
-    global game
-
-    if {$game(ai$color) eq ""} {
-        return
     }
 
-    puts $game(ai$color) "quit [$game(board) dump]"
-    tkwait variable game(ai$color)
-    post_message $color {} "terminated"
-}
-
-
-proc stop_ais {} {
-    foreach color {blue red} {
-        stop_ai $color
+    method hide {} {
+        if {[wm state $Hull] ne "withdrawn"} {
+            wm withdraw $Hull
+        }
     }
+
+    method Hull {} { return $Hull }
 }
 
+oo::class create configwindow {
+    superclass Toplevel
+    variable Config
 
-proc ai_ready {color} {
-    global game
+    constructor {path args} {
+        global ais
 
-    if {[eof $game(ai$color)]} {
-        if {$game(current) eq "done"} {
-            close $game(ai$color)
-            set game(ai$color) ""
-            return
+        my AddCommands play
+        next $path {*}$args
+        my hide
+
+        array set Config {}
+        set Config(blue) human
+        set Config(red) human
+        set Config(first) blue
+        set Config(size) 11
+
+        set w [my Hull]
+        wm title $w "Hex Setup"
+        bind $w <Destroy> { exit }
+
+        set c [ttk::frame $w.f]
+        pack $c -fill both -expand 1
+
+        foreach {name text} {blue "Blue:" red "Red:"} {
+            ttk::labelframe $c.$name -text $text
+            pack $c.$name -side top -fill both -expand 1 -padx 10 -pady 10
+
+            ttk::combobox $c.$name.sel \
+                -state readonly \
+                -values [array names ais] \
+                -textvariable [my Config $name]
+            pack $c.$name.sel -side top -fill x -expand 1 -padx 10 -pady 10
+
+            ttk::radiobutton $c.$name.first \
+                -text "First turn" \
+                -value $name \
+                -variable [my Config first]
+            pack $c.$name.first -side top -fill x -expand 1 -padx 10 -pady 10
         }
 
-        error "ai $color dead"
+        # TODO this is kind of ugly next to the TTK widgets, but ttk::scale
+        # doesn't support the -resolution option.
+        tk::scale $c.size \
+            -from 7 -to 19 \
+            -orient horizontal \
+            -variable [my Config size] \
+            -resolution 1
+        pack $c.size -side top -fill x -padx 10 -pady 10
+
+        ttk::button $c.play -text Play \
+            -command [list [self namespace]::my InvokeCommand play]
+        pack $c.play -side bottom -fill x -padx 10 -pady 10
     }
 
-    set line [gets $game(ai$color)]
-    if {$line ne ""} {
-        receive_move $line
+    method get {key} { set [my Config $key] }
+
+    method Config {key} { return [self namespace]::Config($key) }
+}
+
+oo::class create gamewindow {
+    superclass Toplevel
+    variable View Config Cons Session
+
+    constructor {path} {
+        global tilesize
+
+        next $path -class "Hex Game"
+        my hide
+
+        set w [my Hull]
+        wm title $w "Hex Game"
+        bind $w <Destroy> [list [self namespace]::my OnQuit]
+
+        set View [gameboard new $w.view $tilesize]
+        pack $w.view -side top
+
+        set Config [configwindow new $w.config -class "Hex Game" \
+                        -playcommand [list [self] startgame] \
+                       ]
+
+        set Session ""
+
+        foreach c {blue red} {
+            set Cons($c) [aiconsole new $w.$c $c -class "Hex Game"]
+        }
+
+        set mbar [menu $w.mbar]
+        $w configure -menu $mbar
+
+        set mgame [menu $mbar.game -tearoff 0]
+        $mgame add command -label "New..." -underline 0 \
+            -command [list [self] configuregame]
+        $mgame add command -label "Restart" -underline 0 \
+            -command [list [self] startgame]
+        $mgame add command -label "Quit" -underline 0 \
+            -command [list [self namespace]::my OnQuit]
+
+        set mview [menu $mbar.view -tearoff 0]
+        $mview add command -label "AI Blue Console" -underline 3 \
+            -command [list $Cons(blue) show]
+        $mview add command -label "AI Red Console" -underline 3 \
+            -command [list $Cons(red) show]
+
+        $mbar add cascade -label "Game" -underline 0 -menu $mgame
+        $mbar add cascade -label "View" -underline 0 -menu $mview
+    }
+
+    method endgame {} {
+        if {$Session ne ""} {
+            $Session destroy
+            set Session ""
+        }
+    }
+
+    method startgame {} {
+        global ais
+        $Config hide
+
+        my endgame
+        set Session [hexsession new \
+                         [$Config get size] \
+                         [$Config get first] \
+                         $ais([$Config get blue]) {} \
+                         $ais([$Config get red]) {} \
+                        ]
+
+        foreach c {blue red} {
+            [$Session $c] configure \
+                -outcommand [list $Cons($c) add] \
+                -errcommand [list $Cons($c) adderror]
+        }
+
+        $View attach $Session
+        $Session start
+        my show
+    }
+
+    method configuregame {} {
+        my hide
+        my endgame
+        $Config show
+    }
+
+    method OnQuit {} {
+        # TODO: prompt for exit
+        my endgame
+        exit
     }
 }
 
+oo::class create aiconsole {
+    superclass Toplevel
+    variable w
 
-proc ai_err {color} {
-    global game
+    constructor {path color args} {
+        next $path {*}$args
+        my hide
 
-    if {[eof $game(ai$color,err)]} {
-        close $game(ai$color,err)
-        return
+        set w [my Hull]
+        wm title $w "AI $color Console"
+
+        ttk::scrollbar $w.scroll -orient vertical -command [list $w.log yview]
+        pack $w.scroll -side right -fill y
+
+        text $w.log -state disabled -yscrollcommand [list $w.scroll set]
+        pack $w.log -side right -fill both -expand 1
+
+        $w.log tag configure err -foreground red
+
+        # wm transient $w [winfo parent $w]
+        wm group $w [winfo parent $w]
+        wm protocol $w WM_DELETE_WINDOW [list [self] hide]
     }
 
-    set line [gets $game(ai$color,err)]
-    if {$line ne ""} {
-        post_message $color err [string trim $line]
-    }
-}
+    forward add my Post {}
+    forward adderror my Post err
 
+    method Post {tags msg} {
+        $w.log configure -state normal
+        $w.log insert end "$msg\n" $tags
+        $w.log configure -state disabled
+        $w.log see end
 
-proc post_message {color tags msg} {
-    set w .con$color
-    set t $w.log
-
-    $t configure -state normal
-    $t insert end "$msg\n" $tags
-    $t configure -state disabled
-
-    if {[wm state $w] eq "withdrawn"} {
-        wm deiconify $w
-    }
-}
-
-
-proc hex_click_allowed {} {
-    global game
-    return [expr {$game(current) ne "done" && $game(ai$game(current)) eq ""}]
-}
-
-
-proc human_ready {m} {
-    # make sure we're supposed to be looking at moves from humans
-    if {[hex_click_allowed]} {
-        receive_move $m
+        my show
     }
 }
 
+oo::class create gameboard {
+    variable Hull Scale Session
 
-proc request_move {color} {
-    global game
-
-    # if we have an AI, tell it to move. Otherwise, we just wait for the user to
-    # move.
-    if {$game(ai$color) ne ""} {
-        puts $game(ai$color) "move [$game(board) dump]"
-    }
-}
-
-
-proc receive_move {m} {
-    global game
-    global color
-
-    # check to see if the move is legal
-    if {[$game(board) get $m] ne ""} {
-        # TODO nicer error handling
-        error "illegal move"
+    constructor {path scale args} {
+        set Hull [canvas $path]
+        set Scale $scale
+        set Session ""
+        my Rebuild
     }
 
-    # update the game state
-    $game(board) set $m $game(current)
-    mark_space {*}$m $game(current)
-
-    # check for a win
-    set winner [$game(board) winner]
-    if {$winner ne ""} {
-        end_game
-        .game.view configure -bg $color($winner)
-        hex_refresh $game(selected)
-        return
+    method attach {session} {
+        set Session $session
+        $Session configure \
+            -acceptcommand [list [self namespace]::my MarkSpace] \
+            -wincommand [list [self namespace]::my OnWin]
+        my Rebuild
     }
 
-    if {$game(current) eq "red"} {
-        set game(current) blue
-    } else {
-        set game(current) red
+    method refresh {m {entering 0} {setcursor 1}} {
+        global colors
+
+        if {$Session eq ""} { return }
+
+        set cursor {}
+        if {$m ne ""} {
+            set t [join $m ,]
+            set tags [$Hull gettags $t]
+
+            set turnof [$Session turnof]
+            if {![lhas $tags taken]} {
+                if {$entering} {
+                    $Hull itemconfigure $t -fill $colors(hover_$turnof)
+                    if {[$Session postable $turnof]} {
+                        set cursor hand2
+                    } elseif {$turnof ne "done"} {
+                        set cursor watch
+                    }
+                } else {
+                    $Hull itemconfigure $t -fill $colors(empty)
+                }
+            }
+        }
+
+        if {$setcursor} {
+            $Hull configure -cursor $cursor
+        }
     }
 
-    hex_refresh $game(selected)
-    request_move $game(current)
-}
+    method DrawHex {r c tags} {
+        global stcos
+        global stsin
+        global colors
 
+        set x [my X $r $c]
+        set y [my Y $r $c]
 
-proc end_game {} {
-    global game
-    set game(current) done
-    stop_ais
-}
+        for {set a 30} {$a < 360} {incr a 60} {
+            lappend points [expr {$x+$Scale*$stcos($a)}] [expr {$y+$Scale*$stsin($a)}]
+        }
 
-
-proc configure_game {} {
-    end_game
-
-    wm withdraw .game
-    wm deiconify .config
-}
-
-
-proc restart_game {} {
-    end_game
-    start_game
-}
-
-
-proc play_game {} {
-    wm withdraw .config
-    wm deiconify .game
-
-    start_game
-}
-
-
-proc start_game {} {
-    global gameconfig
-    global game
-
-    if {$game(board) ne ""} {
-        $game(board) destroy
+        set id [$Hull create polygon $points -tags $tags -width 0]
+        my refresh $id 0 0
     }
 
-    set game(current) $gameconfig(first)
-    set game(board) [hex::board new $gameconfig(size)]
-    draw_board .game.view 40 $game(board)
-
-    foreach c {blue red} {
-        start_ai $gameconfig($c) $c
+    method X {r c} { return [expr {$Scale * ($c*2 + $r + 3)}] }
+    method Y {r c} {
+        global stcos
+        return [expr {$Scale * 2 * ($r*$stcos(30) + 1)}]
     }
 
-    request_move $game(current)
-}
+    method DrawEdge {color rcs} {
+        global colors
 
+        $Hull create polygon [join [lmap {r c} $rcs {
+            list [my X $r $c] [my Y $r c]
+        }]] -fill $colors($color) -width 0 -tags taken
+    }
+
+    method Rebuild {} {
+        global stcos
+        global colors
+
+        if {$Session eq ""} { return }
+
+        set w [expr {$Scale * 2}]
+        set d [$Session size]
+        set d1 [expr {$d - 1}]
+        set width [expr {($d*3 + 3) * $Scale}]
+        set height [expr {$Scale * ($d * 2 + 0.5) * $stcos(30) + $Scale * 2}]
+
+        $Hull delete all
+        $Hull configure -width $width -height $height -bg $colors(background)
+
+        # red player edges
+        my DrawEdge red [list -1 -1 0 0 0 $d1 -1 $d]
+        my DrawEdge red [list $d $d $d1 $d1 $d1 0 $d -1]
+
+        # blue player edges
+        my DrawEdge blue [list $d1 0 0 0 -1 -1 $d -1]
+        my DrawEdge blue [list $d $d -1 $d 0 $d1 $d1 $d1]
+
+        # hexes
+        for {set c 0} {$c < [$Session size]} {incr c} {
+            for {set r 0} {$r < [$Session size]} {incr r} {
+                set tag "$r,$c"
+                my DrawHex $r $c [list $tag]
+                $Hull bind $tag <Enter> [list [self] refresh [list $r $c] 1]
+                $Hull bind $tag <Leave> [list [self] refresh [list $r $c] 0]
+                $Hull bind $tag <1> [list [self namespace]::my OnClick [list $r $c]]
+            }
+        }
+    }
+
+    method MarkSpace {color rc} {
+        global colors
+
+        set t [join $rc ,]
+        $Hull addtag taken withtag $t
+        $Hull itemconfigure $t -fill $colors($color)
+        $Hull bind $t <Enter> {}
+        $Hull bind $t <Leave> {}
+        $Hull bind $t <1> {}
+        my refresh current 1
+    }
+
+    method OnWin {color} {
+        global colors
+
+        if {$color ne ""} {
+            $Hull configure -background $colors($color)
+        }
+    }
+
+    method OnClick {m} {
+        if {$Session eq ""} { return }
+
+        set turnof [$Session turnof]
+        if {[$Session postable $turnof]} {
+            [$Session $turnof] post $m
+        }
+    }
+}
 
 proc main {} {
     set share [file dirname [info script]]
-    set ::game(ais) [find_ais $share]
+    find_ais $share
 
     if {[lindex $::tcl_platform(os) 0] eq "Windows"} {
         ttk::style theme use xpnative
@@ -508,13 +443,8 @@ proc main {} {
         set ::env(LD_LIBRARY_PATH) [join $ldpath $sep]
     }
 
-    build_config [toplevel .config -class "Hex Game"]
-    build_gameview [toplevel .game -class "Hex Game"]
-    build_aiconsole [toplevel .conred -class "Hex Game"] red
-    build_aiconsole [toplevel .conblue -class "Hex Game"] blue
     wm withdraw .
-    wm withdraw .game
+    [gamewindow new .game] configuregame
 }
-
 
 main
