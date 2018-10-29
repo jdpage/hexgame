@@ -1,3 +1,5 @@
+package provide app-hextk 1.0
+
 # hextk GUI
 # Copyright (C) 2018  Jonathan David Page <jonathan@sleepingcyb.org>
 #
@@ -426,12 +428,13 @@ oo::class create gameboard {
 }
 
 proc main {} {
-    set share [file dirname [info script]]
+    set share [file dirname $::starkit::topdir]
     find_ais $share
 
-    if {[lindex $::tcl_platform(os) 0] eq "Windows"} {
+    set platform [lindex $::tcl_platform(os) 0]
+    if {$platform eq "Windows"} {
         ttk::style theme use xpnative
-    } else {
+    } elseif {$platform eq "Linux"} {
         # TODO calculate this properly
         # seems to behave super weird under Linux
         tk scaling 1.0
@@ -439,7 +442,7 @@ proc main {} {
 
         set sep $::tcl_platform(pathSeparator)
         set ldpath [split [array get ::env LD_LIBRARY_PATH] $sep]
-        lappend ldpath $share
+        lappend ldpath [file join $::starkit::topdir "lib/hex"]
         set ::env(LD_LIBRARY_PATH) [join $ldpath $sep]
     }
 

@@ -7,6 +7,7 @@ include (GNUInstallDirs)
 find_package (Chicken REQUIRED)
 find_package (TclStub REQUIRED)
 
+set (HEX_DATADIR "${CMAKE_INSTALL_DATADIR}/${CMAKE_PROJECT_NAME}")
 set (HEX_AI_DIR "${CMAKE_INSTALL_DATADIR}/${CMAKE_PROJECT_NAME}/ai")
 
 set (CMAKE_C_STANDARD 99)
