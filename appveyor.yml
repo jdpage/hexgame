@@ -1,7 +1,7 @@
 version: 0.1.{build}
 image: Visual Studio 2017
 install:
-- ps: choco install -i chicken
+- ps: choco install -i -y --no-progress chicken
 
 build_script:
 - ps: .\build-mingw64.ps1
