@@ -36,12 +36,11 @@ target_include_directories (hex
   ${TCL_INCLUDE_PATH}
   )
 
-install (TARGETS hex
-  LIBRARY DESTINATION ${HEX_DATADIR}/hextk/lib/hex
-  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-
 if (NOT WIN32)
+  # Don't install on Win32, since we build a starkit instead
+  install (TARGETS hex
+    LIBRARY DESTINATION ${HEX_DATADIR}/hextk/lib/hex
+    RUNTIME DESTINATION ${HEX_DATADIR}/hextk/lib/hex)
+
   install (FILES pkgIndex.tcl DESTINATION ${HEX_DATADIR}/hextk/lib/hex)
-else ()
-  install (FILES pkgIndex.tcl DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif ()
