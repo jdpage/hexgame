@@ -33,7 +33,7 @@ try {
     }
 
     Push-Location ".\build-mingw64"; try {
-        &cmake .. -G "MinGW Makefiles" -DCMAKE_INSTALL_PREFIX=install
+        &cmake .. -G "MinGW Makefiles" -DCHICKEN_HOME=C:\chicken -DCMAKE_INSTALL_PREFIX=install
         if (-not $?) { throw "CMake error" }
         &mingw32-make.exe package
         if (-not $?) { throw "Make error" }
