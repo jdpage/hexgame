@@ -8,18 +8,19 @@ if (WIN32)
   file (DOWNLOAD
     http://kitcreator.rkeene.org/kits/aa67f5e0a4ae35b119a79639b841034aef9a5034/tclkit.exe
     ${TCLKIT}
-    EXPECTED_HASH SHA256=4555fadada21a55aa172834f80f55caa7fc644cc56eb7eef0c2d710fe1f2dcb6
-    SHOW_PROGRESS
-    )
+    EXPECTED_HASH SHA256=4555fadada21a55aa172834f80f55caa7fc644cc56eb7eef0c2d710fe1f2dcb6)
+  set (TCLKITSH "${CMAKE_CURRENT_BINARY_DIR}/tools/tclkitsh.exe")
+  file (DOWNLOAD
+    http://kitcreator.rkeene.org/kits/c8ef30163de13d3fe7c2a7cffbc9e528f8b89b6c/tclkit.exe
+    ${TCLKITSH}
+    EXPECTED_HASH SHA256=9c9c7ae2478e42cbf03e2a8b62df1deadb775777c932de0e05672b3173930509)
 
   # SDX for 2011-03-17. This is latest at time of writing AFAICT.
   set (SDXKIT "${CMAKE_CURRENT_BINARY_DIR}/tools/sdx.kit")
   file (DOWNLOAD
     https://chiselapp.com/user/aspect/repository/sdx/uv/sdx-20110317.kit
     ${SDXKIT}
-    EXPECTED_HASH SHA256=04dc85d4503c037f26c2b8719e45e4e20385674fbc7404481f3c171fce0a26c3
-    SHOW_PROGRESS
-    )
+    EXPECTED_HASH SHA256=04dc85d4503c037f26c2b8719e45e4e20385674fbc7404481f3c171fce0a26c3)
 
   # Copy directory structure into a vfs folder
   set (HEXTK_SOURCES
@@ -53,11 +54,11 @@ if (WIN32)
     COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/support/windows/tcl/pkgIndex.tcl" "${VFS_DIR}/lib/ntapi/pkgIndex.tcl"
     COMMENT "Copying ntapi into VFS")
 
-  # Build starkit. We assume that you are using ActiveTcl, not MinGW Tcl.
+  # Build starkit.
   add_custom_target (hextk_starkit ALL
     DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/hextk.exe")
   add_custom_command (OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/hextk.exe"
-    COMMAND ${TCL_TCLSH} ${SDXKIT} wrap hextk.exe -vfs vfs -runtime ${TCLKIT}
+    COMMAND ${TCLKITSH} ${SDXKIT} wrap hextk.exe -vfs vfs -runtime ${TCLKIT}
     DEPENDS hextk_starkit_sources hextk_starkit_hex hex hextk_starkit_ntapi ntapi ${HEXTK_SOURCES}
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
