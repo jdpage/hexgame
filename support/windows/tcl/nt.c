@@ -1,4 +1,4 @@
-// NT Job Object API for Tcl
+// Miscellaneous NT API bindings for Tcl
 // Copyright (C) 2018  Jonathan David Page <jonathan@sleepingcyb.org>
 //
 // This program is free software: you can redistribute it and/or modify
