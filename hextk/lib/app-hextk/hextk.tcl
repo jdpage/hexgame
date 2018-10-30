@@ -31,7 +31,7 @@ for {set a 0} {$a <= 360} {incr a 30} {
     set stsin($a) [expr {sin($ang)}]
 }
 
-set tilesize 40
+set tilesize 20
 
 array set colors {}
 set colors(empty) white
@@ -428,12 +428,18 @@ oo::class create gameboard {
 }
 
 proc main {} {
+    global tilesize
+
     set share [file dirname $::starkit::topdir]
     find_ais $share
 
     set platform [lindex $::tcl_platform(os) 0]
     if {$platform eq "Windows"} {
         ttk::style theme use xpnative
+
+        # Windows DPI support is pretty respectable, so we'll just that.
+        set tilesize [expr {$tilesize * [tk scaling]}]
+
     } elseif {$platform eq "Linux"} {
         # TODO calculate this properly
         # seems to behave super weird under Linux
