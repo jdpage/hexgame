@@ -1,0 +1,14 @@
+version: 0.1.{build}
+image: Visual Studio 2017
+install:
+- ps: choco install -i chicken
+
+build_script:
+- ps: >-
+    $ENV:PATH="C:\msys64\mingw64\bin;$ENV:PATH"
+    mkdir build; cd build
+    cmake .. -G "MinGW Makefiles" -DCMAKE_INSTALL_PREFIX=install
+    mingw32-make package
+
+artifacts:
+- path: build/hexgame-*.zip
