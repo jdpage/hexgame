@@ -54,13 +54,17 @@ proc find_ais {share} {
     global ais
 
     set aipath [file join $share ai]
-    foreach ai [glob -directory $aipath "*[info sharedlibextension]"] {
-        set name [file rootname [file tail $ai]]
-        if {[string compare -length 3 lib $name] == 0} {
-            set name [string range $name 3 end]
-        }
+    try {
+        foreach ai [glob -directory $aipath "*[info sharedlibextension]"] {
+            set name [file rootname [file tail $ai]]
+            if {[string compare -length 3 lib $name] == 0} {
+                set name [string range $name 3 end]
+            }
 
-        set ais($name) [file normalize $ai]
+            set ais($name) [file normalize $ai]
+        }
+    } trap {TCL OPERATION GLOB NOMATCH} {} {
+        # No ais, I guess
     }
 }
 
