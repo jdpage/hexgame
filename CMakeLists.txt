@@ -1,5 +1,5 @@
 cmake_minimum_required (VERSION 3.11)
-project (hexgame)
+project (hexgame VERSION 0.1 LANGUAGES C)
 
 set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
 

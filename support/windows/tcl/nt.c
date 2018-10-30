@@ -20,11 +20,13 @@
 #include <windows.h>
 #include <tcl.h>
 #include <tclOO.h>
+#include <tk.h>
+#include <tkPlatDecls.h>
 
-#if defined(ntjobs_EXPORTS)
-#define NTJOBS_EXPORT extern __declspec(dllexport)
+#if defined(ntapi_EXPORTS)
+#define Ntapi_EXPORT extern __declspec(dllexport)
 #else
-#define NTJOBS_EXPORT
+#define Ntapi_EXPORT
 #endif
 
 #ifdef __GNUC__
@@ -39,41 +41,7 @@
     }                                           \
   } while (0)
 
-static void Ntjobs_DeleteJobMetadata(ClientData metadata)
-{
-  CloseHandle((HANDLE) metadata);
-}
-
-static int Ntjobs_CloneJobMetadata(
-  Tcl_Interp *interp,
-  ClientData UNUSED(srcMetadata),
-  ClientData *UNUSED(dstMetadataPtr))
-{
-  Tcl_SetResult(interp, "nt::job objects cannot be cloned", TCL_STATIC);
-  return TCL_ERROR;
-}
-
-static Tcl_ObjectMetadataType Ntjobs_JobMetadata = {
-  .version = TCL_OO_METADATA_VERSION_CURRENT,
-  .name = "Ntjobs_Metadata",
-  .deleteProc = &Ntjobs_DeleteJobMetadata,
-  .cloneProc = &Ntjobs_CloneJobMetadata,
-};
-
-static int Ntjobs_ContextToHandle(
-  Tcl_ObjectContext context,
-  HANDLE *handle)
-{
-  Tcl_Object self;
-  if ((self = Tcl_ObjectContextObject(context)) == NULL) {
-    return TCL_ERROR;
-  }
-
-  *handle = Tcl_ObjectGetMetadata(self, &Ntjobs_JobMetadata);
-  return TCL_OK;
-}
-
-static int Ntjobs_FormatWin32Error(Tcl_Interp *interp, DWORD error)
+static int Ntapi_FormatWin32Error(Tcl_Interp *interp, DWORD error)
 {
   wchar_t *msg;
   Tcl_DString mbmsg;
@@ -101,7 +69,133 @@ static int Ntjobs_FormatWin32Error(Tcl_Interp *interp, DWORD error)
   return TCL_ERROR;
 }
 
-static int Ntjobs_JobConstructor(
+static int Ntapi_SetProcessDpiAwareCmd(
+  ClientData UNUSED(clientData),
+  Tcl_Interp *interp,
+  int objc,
+  Tcl_Obj *const objv[])
+{
+  HMODULE user32;
+  int result = 0;
+  FARPROC proc;
+  BOOL (WINAPI * SetProcessDPIAware)(void);
+
+  if (objc != 1) {
+    Tcl_WrongNumArgs(interp, 1, objv, "");
+    return TCL_ERROR;
+  }
+
+  if ((user32 = LoadLibrary(L"User32.dll")) == NULL) {
+    return Ntapi_FormatWin32Error(interp, GetLastError());
+  }
+
+  if ((proc = GetProcAddress(user32, "SetProcessDPIAware")) == NULL) {
+    result = 0;
+    goto cleanup;
+  }
+
+  SetProcessDPIAware = (BOOL (WINAPI *)(void)) (void (*)(void)) proc;
+  result = SetProcessDPIAware();
+
+ cleanup:
+  FreeLibrary(user32);
+
+  Tcl_SetObjResult(interp, Tcl_NewIntObj(result));
+  return TCL_OK;
+}
+
+static int Ntapi_GetDpiForWindowCmd(
+  ClientData UNUSED(clientData),
+  Tcl_Interp *interp,
+  int objc,
+  Tcl_Obj *const objv[])
+{
+  int dpi = 96;
+  char *win = ".";
+  Tk_Window tkwin;
+  Window xwin;
+  HWND wwin;
+  HMODULE user32;
+  FARPROC proc;
+  UINT (*GetDpiForWindow)(HWND hwnd);
+
+  if (objc != 1 && objc != 2) {
+    Tcl_WrongNumArgs(interp, 1, objv, "?window?");
+    return TCL_ERROR;
+  }
+
+  if ((tkwin = Tk_MainWindow(interp)) == NULL) {
+    return TCL_ERROR;
+  }
+
+  if (objc == 2) {
+    win = Tcl_GetString(objv[1]);
+    if ((tkwin = Tk_NameToWindow(interp, win, tkwin)) == NULL) {
+      return TCL_ERROR;
+    }
+  }
+
+  if ((xwin = Tk_WindowId(tkwin)) == 0) {
+    Tcl_SetObjResult(interp, Tcl_ObjPrintf(
+                       "couldn't get X window for %s", win));
+    return TCL_ERROR;
+  }
+
+  wwin = Tk_GetHWND(xwin);
+
+  if ((user32 = LoadLibrary(L"User32.dll")) == NULL) {
+    return Ntapi_FormatWin32Error(interp, GetLastError());
+  }
+
+  if ((proc = GetProcAddress(user32, "GetDpiForWindow")) == NULL) {
+    goto cleanup;
+  }
+
+  GetDpiForWindow = (UINT (*)(HWND hwnd)) (void (*)(void)) proc;
+  dpi = (int) GetDpiForWindow(wwin);
+
+ cleanup:
+  FreeLibrary(user32);
+
+  Tcl_SetObjResult(interp, Tcl_NewIntObj(dpi));
+  return TCL_OK;
+}
+
+static void Ntapi_DeleteJobMetadata(ClientData metadata)
+{
+  CloseHandle((HANDLE) metadata);
+}
+
+static int Ntapi_CloneJobMetadata(
+  Tcl_Interp *interp,
+  ClientData UNUSED(srcMetadata),
+  ClientData *UNUSED(dstMetadataPtr))
+{
+  Tcl_SetResult(interp, "nt::job objects cannot be cloned", TCL_STATIC);
+  return TCL_ERROR;
+}
+
+static Tcl_ObjectMetadataType Ntapi_JobMetadata = {
+  .version = TCL_OO_METADATA_VERSION_CURRENT,
+  .name = "Ntapi_Metadata",
+  .deleteProc = &Ntapi_DeleteJobMetadata,
+  .cloneProc = &Ntapi_CloneJobMetadata,
+};
+
+static int Ntapi_ContextToHandle(
+  Tcl_ObjectContext context,
+  HANDLE *handle)
+{
+  Tcl_Object self;
+  if ((self = Tcl_ObjectContextObject(context)) == NULL) {
+    return TCL_ERROR;
+  }
+
+  *handle = Tcl_ObjectGetMetadata(self, &Ntapi_JobMetadata);
+  return TCL_OK;
+}
+
+static int Ntapi_JobConstructor(
   ClientData UNUSED(clientData),
   Tcl_Interp *interp,
   Tcl_ObjectContext objectContext,
@@ -133,14 +227,14 @@ static int Ntjobs_JobConstructor(
   }
 
   if ((job = CreateJobObject(NULL, NULL)) == NULL) {
-    return Ntjobs_FormatWin32Error(interp, GetLastError());
+    return Ntapi_FormatWin32Error(interp, GetLastError());
   }
 
-  Tcl_ObjectSetMetadata(self, &Ntjobs_JobMetadata, job);
+  Tcl_ObjectSetMetadata(self, &Ntapi_JobMetadata, job);
   return TCL_OK;
 }
 
-static int Ntjobs_JobMethodLimit(
+static int Ntapi_JobMethodLimit(
   ClientData UNUSED(clientData),
   Tcl_Interp *interp,
   Tcl_ObjectContext objectContext,
@@ -149,7 +243,7 @@ static int Ntjobs_JobMethodLimit(
 {
   HANDLE self;
   JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits;
-  TCLTRY(Ntjobs_ContextToHandle(objectContext, &self));
+  TCLTRY(Ntapi_ContextToHandle(objectContext, &self));
 
   if (objc < 4 || (objc % 2) != 0) {
     Tcl_WrongNumArgs(interp, 1, objv, "limit -option value ?...?");
@@ -161,7 +255,7 @@ static int Ntjobs_JobMethodLimit(
         &limits, sizeof(JOBOBJECT_EXTENDED_LIMIT_INFORMATION),
         NULL))
   {
-    return Ntjobs_FormatWin32Error(interp, GetLastError());
+    return Ntapi_FormatWin32Error(interp, GetLastError());
   }
 
   for (int k = 2; k < objc; k += 2) {
@@ -186,13 +280,13 @@ static int Ntjobs_JobMethodLimit(
         self, JobObjectExtendedLimitInformation,
         &limits, sizeof(JOBOBJECT_EXTENDED_LIMIT_INFORMATION)))
   {
-    return Ntjobs_FormatWin32Error(interp, GetLastError());
+    return Ntapi_FormatWin32Error(interp, GetLastError());
   }
 
   return TCL_OK;
 }
 
-static int Ntjobs_JobMethodAssign(
+static int Ntapi_JobMethodAssign(
   ClientData UNUSED(clientData),
   Tcl_Interp *interp,
   Tcl_ObjectContext objectContext,
@@ -200,7 +294,7 @@ static int Ntjobs_JobMethodAssign(
   Tcl_Obj *const *objv)
 {
   HANDLE self;
-  TCLTRY(Ntjobs_ContextToHandle(objectContext, &self));
+  TCLTRY(Ntapi_ContextToHandle(objectContext, &self));
 
   if (objc < 3) {
     Tcl_WrongNumArgs(interp, 1, objv, "assign pid ?pid ...?");
@@ -218,11 +312,11 @@ static int Ntjobs_JobMethodAssign(
 
     if ((proc = OpenProcess(
            PROCESS_SET_QUOTA | PROCESS_TERMINATE, 0, (DWORD) pid)) == NULL) {
-      return Ntjobs_FormatWin32Error(interp, GetLastError());
+      return Ntapi_FormatWin32Error(interp, GetLastError());
     }
 
     if (!AssignProcessToJobObject(self, proc)) {
-      err = Ntjobs_FormatWin32Error(interp, GetLastError());
+      err = Ntapi_FormatWin32Error(interp, GetLastError());
     }
 
     CloseHandle(proc);
@@ -232,14 +326,14 @@ static int Ntjobs_JobMethodAssign(
   return TCL_OK;
 }
 
-static Tcl_MethodType Ntjobs_JobMethods[] = {
-  { TCL_OO_METHOD_VERSION_CURRENT, NULL, Ntjobs_JobConstructor, NULL, NULL },
-  { TCL_OO_METHOD_VERSION_CURRENT, "limits", Ntjobs_JobMethodLimit, NULL, NULL },
-  { TCL_OO_METHOD_VERSION_CURRENT, "assign", Ntjobs_JobMethodAssign, NULL, NULL },
+static Tcl_MethodType Ntapi_JobMethods[] = {
+  { TCL_OO_METHOD_VERSION_CURRENT, NULL, Ntapi_JobConstructor, NULL, NULL },
+  { TCL_OO_METHOD_VERSION_CURRENT, "limits", Ntapi_JobMethodLimit, NULL, NULL },
+  { TCL_OO_METHOD_VERSION_CURRENT, "assign", Ntapi_JobMethodAssign, NULL, NULL },
   { -1, NULL, NULL, NULL, NULL },
 };
 
-static int Ntjobs_GetOOClass(Tcl_Interp *interp, Tcl_Class *ooclass_cls)
+static int Ntapi_GetOOClass(Tcl_Interp *interp, Tcl_Class *ooclass_cls)
 {
   int err = TCL_OK;
   Tcl_Object ooclass_obj;
@@ -262,8 +356,10 @@ static int Ntjobs_GetOOClass(Tcl_Interp *interp, Tcl_Class *ooclass_cls)
   return err;
 }
 
-NTJOBS_EXPORT int Ntjobs_Init(Tcl_Interp *interp)
+Ntapi_EXPORT int Ntapi_Init(Tcl_Interp *interp)
 {
+  int havetk;
+
   if (Tcl_InitStubs(interp, "8.6", 0) == NULL) {
     return TCL_ERROR;
   }
@@ -272,8 +368,10 @@ NTJOBS_EXPORT int Ntjobs_Init(Tcl_Interp *interp)
     return TCL_ERROR;
   }
 
+  havetk = Tk_InitStubs(interp, "8.6", 0) != NULL;
+
   Tcl_Class ooclass;
-  TCLTRY(Ntjobs_GetOOClass(interp, &ooclass));
+  TCLTRY(Ntapi_GetOOClass(interp, &ooclass));
 
   Tcl_Object jobclass_obj;
   if ((jobclass_obj = Tcl_NewObjectInstance(
@@ -288,16 +386,16 @@ NTJOBS_EXPORT int Ntjobs_Init(Tcl_Interp *interp)
     goto error_cleanup_ntjob;
   }
 
-  for (int k = 0; Ntjobs_JobMethods[k].version != -1; k++) {
+  for (int k = 0; Ntapi_JobMethods[k].version != -1; k++) {
     Tcl_Obj *name = NULL;
-    if (Ntjobs_JobMethods[k].name != NULL) {
-      name = Tcl_NewStringObj(Ntjobs_JobMethods[k].name, -1);
+    if (Ntapi_JobMethods[k].name != NULL) {
+      name = Tcl_NewStringObj(Ntapi_JobMethods[k].name, -1);
     }
 
     Tcl_Method method = Tcl_NewMethod(
       interp, jobclass,
       name, 1,
-      &Ntjobs_JobMethods[k],
+      &Ntapi_JobMethods[k],
       NULL);
 
     if (k == 0) {
@@ -306,8 +404,16 @@ NTJOBS_EXPORT int Ntjobs_Init(Tcl_Interp *interp)
     }
   }
 
+  Tcl_CreateObjCommand(interp, "nt::setprocessdpiaware",
+                       Ntapi_SetProcessDpiAwareCmd, NULL, NULL);
+
+  if (havetk) {
+    Tcl_CreateObjCommand(interp, "nt::getdpiforwindow",
+                        Ntapi_GetDpiForWindowCmd, NULL, NULL);
+  }
+
   // TODO: get version from CMake
-  Tcl_PkgProvide(interp, "ntjobs", "0.1");
+  Tcl_PkgProvide(interp, "ntapi", "0.1");
   return TCL_OK;
 
  error_cleanup_ntjob:

@@ -46,19 +46,19 @@ if (WIN32)
     COMMENT "Copying libhex into VFS")
 
   # Copy ntjobs
-  add_custom_target (hextk_starkit_ntjobs DEPENDS ntjobs)
-  add_custom_command (TARGET hextk_starkit_ntjobs PRE_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${VFS_DIR}/lib/ntjobs"
-    COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:ntjobs>" "${VFS_DIR}/lib/ntjobs/$<TARGET_FILE_NAME:ntjobs>"
-    COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/support/windows/tcl/pkgIndex.tcl" "${VFS_DIR}/lib/ntjobs/pkgIndex.tcl"
-    COMMENT "Copying ntjobs into VFS")
+  add_custom_target (hextk_starkit_ntapi DEPENDS ntapi)
+  add_custom_command (TARGET hextk_starkit_ntapi PRE_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${VFS_DIR}/lib/ntapi"
+    COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:ntapi>" "${VFS_DIR}/lib/ntapi/$<TARGET_FILE_NAME:ntapi>"
+    COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/support/windows/tcl/pkgIndex.tcl" "${VFS_DIR}/lib/ntapi/pkgIndex.tcl"
+    COMMENT "Copying ntapi into VFS")
 
   # Build starkit. We assume that you are using ActiveTcl, not MinGW Tcl.
   add_custom_target (hextk_starkit ALL
     DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/hextk.exe")
   add_custom_command (OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/hextk.exe"
     COMMAND ${TCL_TCLSH} ${SDXKIT} wrap hextk.exe -vfs vfs -runtime ${TCLKIT}
-    DEPENDS hextk_starkit_sources hextk_starkit_hex hex hextk_starkit_ntjobs ntjobs ${HEXTK_SOURCES}
+    DEPENDS hextk_starkit_sources hextk_starkit_hex hex hextk_starkit_ntapi ntapi ${HEXTK_SOURCES}
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
   install (PROGRAMS

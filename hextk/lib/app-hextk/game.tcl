@@ -17,7 +17,7 @@
 package require hex
 
 if {[lindex $::tcl_platform(os) 0] eq "Windows"} {
-    package require ntjobs
+    package require ntapi
 }
 
 proc nextplayer {color} {

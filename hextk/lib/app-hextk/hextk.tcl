@@ -437,11 +437,32 @@ proc main {} {
     set share [file dirname $::starkit::topdir]
     find_ais $share
 
+    # If we're on Windows, we're going to call update to force Tk to map the
+    # main window so that we can get its DPI. This causes the main window to
+    # flash onscreen unless we withdraw it; apparently it still gets an HWND,
+    # even withdrawn, which is all we need.
+    wm withdraw .
+
     set platform [lindex $::tcl_platform(os) 0]
     if {$platform eq "Windows"} {
-        ttk::style theme use xpnative
+        package require ntapi
 
-        # Windows DPI support is pretty respectable, so we'll just that.
+        # Tclkit isn't DPI-aware, and using mt to add a manifest breaks it. So
+        # we need to detect if we're in a high-DPI environment, and adjust our
+        # scaling. In order to get the DPI, we have to force Tk to finish
+        # mapping the main window using update. Additionally, if we're under
+        # ActiveTcl, we might actually be set--in this case, nt::getdpiforwindow
+        # will return the same values before and after nt::setprocessdpiaware,
+        # in which case the scaling won't be altered.
+        update
+        set basescale [tk scaling]
+        set basedpi [nt::getdpiforwindow .]
+        if {[nt::setprocessdpiaware]} {
+            set realdpi [nt::getdpiforwindow .]
+            tk scaling [expr {$realdpi / $basedpi * $basescale}]
+        }
+
+        # Canvas doesn't do scaling, so do it manually by adjusting the tile size.
         set tilesize [expr {$tilesize * [tk scaling]}]
 
     } elseif {$platform eq "Linux"} {
@@ -451,7 +472,6 @@ proc main {} {
         ttk::style theme use clam
     }
 
-    wm withdraw .
     [gamewindow new .game] configuregame
 }
 
