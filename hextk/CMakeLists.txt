@@ -28,7 +28,7 @@ if (WIN32)
     lib/app-hextk/hextk.tcl
     lib/app-hextk/pkgIndex.tcl)
 
-
+  # Copy Tcl sources
   set (VFS_DIR "${CMAKE_CURRENT_BINARY_DIR}/vfs")
   add_custom_target (hextk_starkit_sources DEPENDS ${HEXTK_SOURCES})
   add_custom_command (TARGET hextk_starkit_sources PRE_BUILD
@@ -36,19 +36,29 @@ if (WIN32)
     COMMAND ${CMAKE_COMMAND} -E copy main.tcl "${VFS_DIR}"
     COMMAND ${CMAKE_COMMAND} -E copy_directory lib "${VFS_DIR}/lib"
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-  add_custom_target (hextk_starkit_hex)
+
+  # Copy libhex
+  add_custom_target (hextk_starkit_hex DEPENDS hex)
   add_custom_command (TARGET hextk_starkit_hex PRE_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory "${VFS_DIR}/lib/hex"
     COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:hex>" "${VFS_DIR}/lib/hex/$<TARGET_FILE_NAME:hex>"
     COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/libhex/pkgIndex.tcl" "${VFS_DIR}/lib/hex/pkgIndex.tcl"
     COMMENT "Copying libhex into VFS")
 
+  # Copy ntjobs
+  add_custom_target (hextk_starkit_ntjobs DEPENDS ntjobs)
+  add_custom_command (TARGET hextk_starkit_ntjobs PRE_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${VFS_DIR}/lib/ntjobs"
+    COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:ntjobs>" "${VFS_DIR}/lib/ntjobs/$<TARGET_FILE_NAME:ntjobs>"
+    COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/support/windows/tcl/pkgIndex.tcl" "${VFS_DIR}/lib/ntjobs/pkgIndex.tcl"
+    COMMENT "Copying ntjobs into VFS")
+
   # Build starkit. We assume that you are using ActiveTcl, not MinGW Tcl.
   add_custom_target (hextk_starkit ALL
     DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/hextk.exe")
   add_custom_command (OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/hextk.exe"
     COMMAND ${TCL_TCLSH} ${SDXKIT} wrap hextk.exe -vfs vfs -runtime ${TCLKIT}
-    DEPENDS hextk_starkit_sources hextk_starkit_hex ${HEXTK_SOURCES}
+    DEPENDS hextk_starkit_sources hextk_starkit_hex hex hextk_starkit_ntjobs ntjobs ${HEXTK_SOURCES}
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
   install (PROGRAMS

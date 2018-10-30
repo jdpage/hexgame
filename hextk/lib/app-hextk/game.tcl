@@ -16,6 +16,10 @@
 
 package require hex
 
+if {[lindex $::tcl_platform(os) 0] eq "Windows"} {
+    package require ntjobs
+}
+
 proc nextplayer {color} {
     if {$color eq "blue"} {
         return red
@@ -104,6 +108,24 @@ oo::class create hexgame {
     method turnof {} { return $turnof }
 }
 
+oo::class create autohup {
+    constructor {args} {
+        if {[lindex $::tcl_platform(os) 0] eq "Windows"} {
+            puts "Creating NT job"
+            nt::job create job
+            job limits -killonjobclose 1
+            job assign {*}$args
+        }
+    }
+
+    destructor {
+        if {[lindex $::tcl_platform(os) 0] eq "Windows"} {
+            puts "Destroying NT job"
+            job destroy
+        }
+    }
+}
+
 # Class for AI players. Manages a hexmon instance.
 oo::class create aiplayer {
     mixin CommandInvoking
@@ -118,6 +140,7 @@ oo::class create aiplayer {
 
         foreach {err w} [chan pipe] {}
         set comm [open |[list hexmon $size $color $path {*}$opts 2>@$w] r+]
+        autohup create job [pid $comm]
         close $w
 
         fconfigure $comm -buffering line -blocking 0
@@ -136,6 +159,8 @@ oo::class create aiplayer {
             fconfigure $comm -blocking 1
             close $comm
         }
+
+        job destroy
     }
 
     method turn {board} {
