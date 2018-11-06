@@ -466,10 +466,14 @@ proc main {} {
         set tilesize [expr {$tilesize * [tk scaling]}]
 
     } elseif {$platform eq "Linux"} {
-        # TODO calculate this properly
-        # seems to behave super weird under Linux
-        tk scaling 1.0
         ttk::style theme use clam
+
+        # TODO work out what is going on here. For some reason, the tk scaling
+        # setting seems to go the wrong way (!) under GNOME3/Wayland, and the
+        # value that it's populated with is hilariously large.
+
+        set tilesize [expr {$tilesize * 2}]
+        tk scaling 1.0
     }
 
     [gamewindow new .game] configuregame
