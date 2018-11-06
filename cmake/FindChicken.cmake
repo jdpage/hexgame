@@ -172,6 +172,7 @@ function (add_chicken_library name type)
   execute_process (COMMAND ${Chicken_CSC_EXECUTABLE} ${myflags} -ldflags
     OUTPUT_VARIABLE _Chicken_LDFLAGS)
   string (STRIP ${_Chicken_LDFLAGS} _Chicken_LDFLAGS)
+  string (REPLACE "\\" "/" _Chicken_LDFLAGS ${_Chicken_LDFLAGS})  # fix for MSYS
   string (REPLACE " " ";" Chicken_LDFLAGS ${_Chicken_LDFLAGS})
   unset (_Chicken_LDFLAGS)
 

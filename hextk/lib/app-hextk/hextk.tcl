@@ -31,7 +31,7 @@ for {set a 0} {$a <= 360} {incr a 30} {
     set stsin($a) [expr {sin($ang)}]
 }
 
-set tilesize 40
+set tilesize 20
 
 array set colors {}
 set colors(empty) white
@@ -54,13 +54,17 @@ proc find_ais {share} {
     global ais
 
     set aipath [file join $share ai]
-    foreach ai [glob -directory $aipath "*[info sharedlibextension]"] {
-        set name [file rootname [file tail $ai]]
-        if {[string compare -length 3 lib $name] == 0} {
-            set name [string range $name 3 end]
-        }
+    try {
+        foreach ai [glob -directory $aipath "*[info sharedlibextension]"] {
+            set name [file rootname [file tail $ai]]
+            if {[string compare -length 3 lib $name] == 0} {
+                set name [string range $name 3 end]
+            }
 
-        set ais($name) [file normalize $ai]
+            set ais($name) [file normalize $ai]
+        }
+    } trap {TCL OPERATION GLOB NOMATCH} {} {
+        # No ais, I guess
     }
 }
 
@@ -428,20 +432,50 @@ oo::class create gameboard {
 }
 
 proc main {} {
+    global tilesize
+
     set share [file dirname $::starkit::topdir]
     find_ais $share
 
+    # If we're on Windows, we're going to call update to force Tk to map the
+    # main window so that we can get its DPI. This causes the main window to
+    # flash onscreen unless we withdraw it; apparently it still gets an HWND,
+    # even withdrawn, which is all we need.
+    wm withdraw .
+
     set platform [lindex $::tcl_platform(os) 0]
     if {$platform eq "Windows"} {
-        ttk::style theme use xpnative
+        package require ntapi
+
+        # Tclkit isn't DPI-aware, and using mt to add a manifest breaks it. So
+        # we need to detect if we're in a high-DPI environment, and adjust our
+        # scaling. In order to get the DPI, we have to force Tk to finish
+        # mapping the main window using update. Additionally, if we're under
+        # ActiveTcl, we might actually be set--in this case, nt::getdpiforwindow
+        # will return the same values before and after nt::setprocessdpiaware,
+        # in which case the scaling won't be altered.
+        update
+        set basescale [tk scaling]
+        set basedpi [nt::getdpiforwindow .]
+        if {[nt::setprocessdpiaware]} {
+            set realdpi [nt::getdpiforwindow .]
+            tk scaling [expr {$realdpi / $basedpi * $basescale}]
+        }
+
+        # Canvas doesn't do scaling, so do it manually by adjusting the tile size.
+        set tilesize [expr {$tilesize * [tk scaling]}]
+
     } elseif {$platform eq "Linux"} {
-        # TODO calculate this properly
-        # seems to behave super weird under Linux
-        tk scaling 1.0
         ttk::style theme use clam
+
+        # TODO work out what is going on here. For some reason, the tk scaling
+        # setting seems to go the wrong way (!) under GNOME3/Wayland, and the
+        # value that it's populated with is hilariously large.
+
+        set tilesize [expr {$tilesize * 2}]
+        tk scaling 1.0
     }
 
-    wm withdraw .
     [gamewindow new .game] configuregame
 }
 

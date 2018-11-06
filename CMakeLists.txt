@@ -1,5 +1,5 @@
 cmake_minimum_required (VERSION 3.11)
-project (hexgame)
+project (hexgame VERSION 0.1 LANGUAGES C)
 
 set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
 
@@ -8,7 +8,13 @@ find_package (Chicken REQUIRED)
 find_package (TclStub REQUIRED)
 
 set (HEX_DATADIR "${CMAKE_INSTALL_DATADIR}/${CMAKE_PROJECT_NAME}")
-set (HEX_AI_DIR "${CMAKE_INSTALL_DATADIR}/${CMAKE_PROJECT_NAME}/ai")
+if (WIN32)
+  set (HEX_BINDIR ".")
+  set (HEX_AI_DIR "./ai")
+else ()
+  set (HEX_BINDIR "${CMAKE_INSTALL_BINDIR}")
+  set (HEX_AI_DIR "${CMAKE_INSTALL_DATADIR}/${CMAKE_PROJECT_NAME}/ai")
+endif ()
 
 set (CMAKE_C_STANDARD 99)
 set (CMAKE_C_EXTENSIONS ON)
@@ -38,3 +44,6 @@ add_subdirectory (hexmon)
 add_subdirectory (support)
 add_subdirectory (ai)
 add_subdirectory (hextk)
+
+set (CPACK_GENERATOR "ZIP")
+include (CPack)
